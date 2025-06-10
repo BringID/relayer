@@ -1,0 +1,17 @@
+# Configs
+*.env
+
+.DS_Store
+node_modules/
+src/deploy/
+
+# Logs
+*.log
+
+# emacs
+*#
+.*#
+*~
+
+#vscode
+.vscode

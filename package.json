@@ -1,0 +1,34 @@
+{
+  "name": "zkbring-relayer",
+  "version": "1.0.0",
+  "main": "server.js",
+  "author": "anticimeeks",
+  "license": "MIT",
+  "engines": {
+    "node": "20.x"
+  },
+  "scripts": {
+    "start": "NODE_ENV=production node server.js",
+    "dev": "NODE_ENV=development nodemon server.js",
+    "test": "NODE_ENV=test mocha --recursive --exit --timeout 50000"
+  },
+  "devDependencies": {
+    "dotenv": "^16.5.0",
+    "nodemon": "^3.1.10",
+    "standard": "^17.1.2"
+  },
+  "dependencies": {
+    "bn.js": "^5.2.1",
+    "celebrate": "^15.0.1",
+    "cli-table": "^0.3.1",
+    "cors": "^2.8.5",
+    "dd-trace": "^5.55.0",
+    "ethers": "^6.14.3",
+    "eventemitter3": "^5.0.0",
+    "express": "^4.18.2",
+    "express-async-handler": "^1.1.4",
+    "mongoose": "^8.15.1",
+    "morgan": "^1.9.1",
+    "winston": "^3.2.1"
+  }
+}

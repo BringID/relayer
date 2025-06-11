@@ -3,7 +3,7 @@ const TransactionSchema = require('./transaction')
 
 const OperationSchema = new mongoose.Schema(
   {
-    taskId: {
+    id: {
       type: String,
       required: true
     },
@@ -37,8 +37,8 @@ const OperationSchema = new mongoose.Schema(
   }
 )
 
-OperationSchema.index({ taskId: 1 })
-OperationSchema.index({ nonce: 1, taskId: 1 }, { unique: true })
+OperationSchema.index({ id: 1 })
+OperationSchema.index({ nonce: 1, id: 1 }, { unique: true })
 
 const Operation = mongoose.model('Operation', OperationSchema)
 module.exports = Operation

@@ -1,45 +1,49 @@
+const { ethers } = require('ethers')
 const logger = require('../utils/logger')
-const relayerWalletService = require('./relayer-wallet-service')
 const operationService = require('./operation-service')
+const relayerWalletService = require('./relayer-wallet-service')
+const transactionTrackerService = require('./transaction-tracker-service')
 
 class RelayerService {
   async addTaskAndSendTx ({
+    id,
     to,
     data,
-    taskId,
     value
   }) {
-    console.log('addTaskAndSendTx', to, data, taskId, value)
-    const operation = await operationService.findById(taskId)
+    const operation = await operationService.findById(id)
     if (operation?.transactions) {
       logger.info(`Existing operation found: ${operation.id}. Operation status - ${operation.status}`)
       return this.getExistingTxHash(operation)
     }
 
-    const txParams = {
-      to,
+    const txParams = { 
+      to, 
       data,
-      value
+      value: ethers.parseUnits(value)
     }
 
-    // send claim transaction to blockchain
-    const promises = [relayerWalletService.sendTransaction(txParams), relayerWalletService.getBlockNumber()]
+
+    const promises = [
+      relayerWalletService.sendTransaction(txParams), 
+      relayerWalletService.getBlockNumber()
+    ]
     const [tx, blockNumber] = await Promise.all(promises)
 
     logger.info('Submitted claim tx: ' + tx.hash)
 
     if (!operation) {
       await operationService.create({
-        taskId,
+        id,
+        data,
         nonce: tx.nonce,
-        claimStarted: blockNumber,
-        data
+        claimStarted: blockNumber
       })
     }
 
     // add transaction details to database
-    await operationService.addTransaction(taskId, tx)
-    operationService.trackPendingOperation(taskId)
+    await operationService.addTransaction(id, tx)
+    transactionTrackerService.trackPendingOperation(id)
 
     return tx.hash
   }
@@ -61,8 +65,7 @@ class RelayerService {
     return lastTxHash
   }
 
-  async getTask ({ to, data, taskId }) {
-  }
+  async getTask ({ to, data, id }) {}
 }
 
 module.exports = new RelayerService()

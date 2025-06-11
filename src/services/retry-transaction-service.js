@@ -1,31 +1,33 @@
+const { ethers } = require('ethers')
+const logger = require('../utils/logger')
 const operationService = require('./operation-service')
 const relayerWalletService = require('./relayer-wallet-service')
-const logger = require('../utils/logger')
 
 class RetryTransactionService {
-  async retryTransaction (operationId) {
-    const operation = await operationService.findById(operationId)
+  async retryTransaction (id) {
+    const operation = await operationService.findById(id)
     const transaction = operation.transactions[operation.transactions.length - 1].toObject()
     const {
       maxFeePerGas,
       maxPriorityFeePerGas
-    } = await relayerWalletService.calculateRetryFees()
+    } = await relayerWalletService.calculateRetryFees(transaction)
 
     const { value, data, gasLimit, to } = transaction.params
 
     const params = {
       to,
       data,
-      nonce: operation.nonce,
       gasLimit,
-      value: ethers.utils.parseUnits(value),
       maxFeePerGas,
-      maxPriorityFeePerGas
+      maxPriorityFeePerGas,
+      nonce: operation.nonce,
+      value: ethers.parseUnits(value).toString()
     }
-    const newTx = await relayerWalletService.sendRetryTransaction(params)
-    logger.warn(`Operation ${operationId}: re-submitted transaction. New tx: ${newTx.hash}`)
 
-    operationService.addTransaction(operationId, newTx)
+    const newTx = await relayerWalletService.sendRetryTransaction(params)
+    logger.warn(`Operation ${id}: re-submitted transaction. New tx: ${newTx.hash}`)
+
+    operationService.addTransaction(id, newTx)
     return newTx
   }
 }

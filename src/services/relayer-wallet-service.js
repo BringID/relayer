@@ -14,13 +14,6 @@ if (stageConfig.RELAYER_PRIVATE_KEY == null || stageConfig.RELAYER_PRIVATE_KEY =
   throw new Error('Please provide relayer private key')
 }
 
-class StaticJsonRpcProvider extends ethers.JsonRpcProvider {
-  async getNetwork () {
-    if (this._network) { return Promise.resolve(this._network) }
-    return super.getNetwork()
-  }
-}
-
 class AutoNonceWallet extends ethers.Wallet {
   async sendTransaction (transaction) {
     if (stageConfig.CHAIN_ID !== '42161') {
@@ -30,7 +23,7 @@ class AutoNonceWallet extends ethers.Wallet {
 
     const isNonceNew = transaction.nonce == null
     if (isNonceNew) {
-      transaction.nonce = nonceQueueService.getNextNonce()
+      transaction.nonce = await nonceQueueService.getNextNonce()
     }
 
     try {
@@ -57,7 +50,9 @@ class AutoNonceWallet extends ethers.Wallet {
 
 class RelayerWalletService {
   constructor () {
-    this.provider = new StaticJsonRpcProvider(stageConfig.JSON_RPC_URL)
+    this.provider = new ethers.JsonRpcProvider(
+      stageConfig.JSON_RPC_URL, undefined, { staticNetwork: true }
+    )
     this.relayerWallet = new AutoNonceWallet(stageConfig.RELAYER_PRIVATE_KEY, this.provider)
   }
 
@@ -222,28 +217,23 @@ class RelayerWalletService {
     return await this.provider.getTransactionReceipt(txHash)
   }
 
-  async calculateRetryFees () {
+  async calculateRetryFees (transaction) {
     let {
       maxFeePerGas,
       maxPriorityFeePerGas
     } = await this.getFeeData()
 
-    const txMaxFeePerGas = ethers.BigNumber.from(transaction.params.maxFeePerGas.toString())
-    const txMaxPriorityFeePerGas = ethers.BigNumber.from(transaction.params.maxPriorityFeePerGas.toString())
+    const txMaxFeePerGas = BigInt(transaction.params.maxFeePerGas.toString())
+    const txMaxPriorityFeePerGas = BigInt(transaction.params.maxPriorityFeePerGas.toString())
 
-    if (txMaxFeePerGas.gte(maxFeePerGas)) {
-      maxFeePerGas = txMaxFeePerGas.add(
-        ethers.BigNumber.from(
-          ethers.utils.parseUnits(stageConfig.GWEI_ADDED_ON_RETRY, 'gwei')
-            .toString()))
+    if (txMaxFeePerGas >= maxFeePerGas) {
+      maxFeePerGas = txMaxFeePerGas + BigInt(ethers.parseUnits(stageConfig.GWEI_ADDED_ON_RETRY, 'gwei'))
     }
 
-    if (txMaxPriorityFeePerGas.gte(maxPriorityFeePerGas)) {
+    if (txMaxPriorityFeePerGas >= maxPriorityFeePerGas) {
       logger.debug(`__feePerGasOption__ : txMaxPriorityFeePerGas: ${txMaxPriorityFeePerGas}, maxPriorityFeePerGas: ${maxPriorityFeePerGas}`)
-      maxPriorityFeePerGas = txMaxPriorityFeePerGas.add(
-        ethers.BigNumber.from(
-          ethers.utils.parseUnits(stageConfig.GWEI_ADDED_TO_PRIORITY_FEE_ON_RETRY, 'gwei')
-            .toString()))
+      maxPriorityFeePerGas = txMaxPriorityFeePerGas + BigInt(
+        ethers.parseUnits(stageConfig.GWEI_ADDED_TO_PRIORITY_FEE_ON_RETRY, 'gwei'))
       logger.debug(`__feePerGasOption__ : ${stageConfig.GWEI_ADDED_TO_PRIORITY_FEE_ON_RETRY} GWEI was added to txMaxPriorityFeePerGas: ${maxPriorityFeePerGas}`)
     }
 

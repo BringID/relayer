@@ -9,19 +9,17 @@ const addTask = async (req, res) => {
   })
 
   const params = {
+    id: req.body.id,
     to: req.body.to,
     data: req.body.data,
-    taskId: req.body.taskId,
-    value: req.body.value
+    value: req.body.value || '0'
   }
-  console.log('params', params)
 
-  const result = await relayerService.addTaskAndSendTx(params)
+  const txHash = await relayerService.addTaskAndSendTx(params)
 
   res.json({
     success: true,
-    tx_hash: result.txHash,
-    status: result.status
+    tx_hash: txHash
   })
 }
 
@@ -29,10 +27,10 @@ const getTask = async (req, res) => {
   logger.json({
     controller: 'relayer-controller',
     method: 'getTask',
-    taskId: req.params.taskId
+    id: req.params.id
   })
 
-  const result = await relayerService.getTask(req.params.taskId)
+  const result = await relayerService.getTask(req.params.id)
 
   res.json({
     success: true,

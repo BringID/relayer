@@ -2,8 +2,8 @@ const logger = require('../utils/logger')
 const Operation = require('../models/operation')
 
 class OperationService {
-  async findById (taskId) {
-    return await Operation.findOne({ taskId })
+  async findById (id) {
+    return await Operation.findOne({ id })
   }
 
   async findPendingTxs () {
@@ -15,22 +15,22 @@ class OperationService {
   }
 
   async create ({
+    id,
     data,
     nonce,
-    taskId,
     claimStarted,
     status = 'created'
   }) {
     const operation = await Operation.create({
+      id,
       data,
       nonce,
-      taskId,
       status,
       claimStarted,
       transactions: []
     })
 
-    logger.info(`New operation saved to database: ${operation.taskId} / ${nonce}`)
+    logger.info(`New operation saved to database: ${operation.id} / ${nonce}`)
     return operation
   }
 
@@ -66,11 +66,11 @@ class OperationService {
     })
 
     await operation.save()
-    logger.info(`Operation ${id} updated on mined tx: ${txHash}`)
+    logger.info(`Operation ${id} updated on mined tx: ${txHash} with status: ${status}`)
   }
 
-  async addTransaction (taskId, tx) {
-    const operation = await this.findById(taskId)
+  async addTransaction (id, tx) {
+    const operation = await this.findById(id)
 
     const transaction = {
       hash: tx.hash,
@@ -82,7 +82,7 @@ class OperationService {
     operation.status = 'pending'
     await operation.save()
 
-    logger.info(`Tx ${transaction.hash} was successfully saved to operation ${operation.taskId}`)
+    logger.info(`Tx ${transaction.hash} was successfully saved to operation ${operation.id}`)
     return operation
   }
 }

@@ -4,12 +4,7 @@ const stageConfig = require('../../stage-config')
 // Set up default mongoose connection
 const connectDB = () => {
   return mongoose.connect(
-    stageConfig.mongoURI || 'mongodb://localhost:27017/linkdrop_db',
-    {
-      useNewUrlParser: true,
-      useCreateIndex: true,
-      useUnifiedTopology: true
-    }
+    stageConfig.mongoURI || 'mongodb://127.0.0.1:27017/dev_zkbring_relayer_db'
   )
 }
 

@@ -11,10 +11,12 @@ const addTask = async (req, res) => {
   const params = {
     to: req.body.to,
     data: req.body.data,
-    taskId: req.body.taskId
+    taskId: req.body.taskId,
+    value: req.body.value
   }
+  console.log('params', params)
 
-  const result = await relayerService.addTask(params)
+  const result = await relayerService.addTaskAndSendTx(params)
 
   res.json({
     success: true,

@@ -61,7 +61,40 @@ class RelayerWalletService {
     this.relayerWallet = new AutoNonceWallet(stageConfig.RELAYER_PRIVATE_KEY, this.provider)
   }
 
-  async sendTransaction (transaction) {
+  async sendTransaction ({
+    to,
+    data,
+    value
+  }) {
+    const { maxFeePerGas, maxPriorityFeePerGas } = await this.getFeeData()
+    const transaction = {
+      to,
+      data,
+      value,
+      maxFeePerGas,
+      maxPriorityFeePerGas
+    }
+    return await this.relayerWallet.sendTransaction(transaction)
+  }
+
+  async sendRetryTransaction ({
+    to,
+    data,
+    nonce,
+    value,
+    gasLimit,
+    maxFeePerGas,
+    maxPriorityFeePerGas
+  }) {
+    const transaction = {
+      to,
+      data,
+      nonce,
+      value,
+      gasLimit,
+      maxFeePerGas,
+      maxPriorityFeePerGas
+    }
     return await this.relayerWallet.sendTransaction(transaction)
   }
 

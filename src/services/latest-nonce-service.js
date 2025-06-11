@@ -4,7 +4,7 @@ const Operation = require('../models/operation')
 
 class LatestNonceService {
   constructor () {
-    this.provider = new ethers.providers.JsonRpcProvider(stageConfig.JSON_RPC_URL)
+    this.provider = new ethers.JsonRpcProvider(stageConfig.JSON_RPC_URL)
     this.wallet = new ethers.Wallet(stageConfig.RELAYER_PRIVATE_KEY, this.provider)
   }
 

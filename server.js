@@ -10,6 +10,7 @@ const morgan = require('morgan')
 const buildRouter = require('./src/routes')
 const logger = require('./src/utils/logger')
 const { isCelebrateError } = require('celebrate')
+const connectDB = require('./src/models/connectDB')
 const asyncHandler = require('express-async-handler')
 const errorToWarn = require('./configs/error-to-warn.json')
 const { requestValidator } = require('./src/utils/request-validator')
@@ -26,11 +27,25 @@ app.use(
   )
 )
 
-// Run server
-const PORT = stageConfig.PORT || stageConfig.CUSTOM_PORT || 8000
-app.listen(PORT, async () => {
-  logger.info(`Server is up on port ${PORT}\n`)
-})
+// connect to database
+connectDB(
+  logger.info('Connected to DB'))
+  .then(() => {
+    // Run server
+    const PORT = stageConfig.PORT || stageConfig.CUSTOM_PORT || 8000
+    app.listen(PORT, async () => {
+      logger.info(`Server is up on port ${PORT}\n`)
+      if (stageConfig.NODE_ENV === 'production') {
+        // reInitNonceQueueScheduler()
+        // retryOperationScheduler()
+        // await retryOperationService.runRetryOperations()
+      }
+    })
+  })
+  .catch(err => {
+    logger.error(`${err}\n`)
+    process.exit(1)
+  })
 // Validate requests with api key
 app.use(asyncHandler(requestValidator))
 

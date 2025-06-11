@@ -7,11 +7,10 @@ const OperationSchema = new mongoose.Schema(
       type: String,
       required: true
     },
-    nonce: { // corresponds to nonce of the transaction
+    nonce: {
       type: Number,
       required: true
     },
-    // should be equal to status of the latest transaction
     status: {
       type: String,
       required: true,
@@ -30,9 +29,7 @@ const OperationSchema = new mongoose.Schema(
       // blockchain block number
       type: Number
     },
-    // data for the operation in unstructed format
-    // as it's different for different operation types
-    data: {},
+    data: String,
     transactions: [TransactionSchema]
   },
   {

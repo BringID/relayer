@@ -14,28 +14,23 @@ class OperationService {
     return await Operation.findOne({ 'transactions.hash': txHash })
   }
 
-  createOperation ({}) {}
-
-  async _create ({
-    id,
-    type,
+  async create ({
     data,
     nonce,
+    taskId,
     claimStarted,
     status = 'created'
   }) {
-
     const operation = await Operation.create({
-      id,
-      type,
       data,
       nonce,
-      proxyAddress,
+      taskId,
+      status,
       claimStarted,
       transactions: []
     })
 
-    logger.info(`New operation saved to database: ${operation.id} / ${nonce}`)
+    logger.info(`New operation saved to database: ${operation.taskId} / ${nonce}`)
     return operation
   }
 
@@ -74,17 +69,8 @@ class OperationService {
     logger.info(`Operation ${id} updated on mined tx: ${txHash}`)
   }
 
-  async updateFailedOperation (operationId) {
-    const operation = await this.findById(operationId)
-    const timestamp = Date.now()
-    operation.id = `error-${operationId}-${timestamp}`
-
-    await operation.save()
-    logger.warn(`FailedOperation ${operationId} updated with new id -- error-${operationId}-${timestamp}`)
-  }
-
-  async addTransaction (operationId, tx) {
-    const operation = await this.findById(operationId)
+  async addTransaction (taskId, tx) {
+    const operation = await this.findById(taskId)
 
     const transaction = {
       hash: tx.hash,
@@ -96,7 +82,7 @@ class OperationService {
     operation.status = 'pending'
     await operation.save()
 
-    logger.info(`Tx ${transaction.hash} was successfully saved to operation ${operation.id}`)
+    logger.info(`Tx ${transaction.hash} was successfully saved to operation ${operation.taskId}`)
     return operation
   }
 }

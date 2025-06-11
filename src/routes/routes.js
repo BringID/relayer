@@ -6,7 +6,7 @@ const routes = {
       // celebrateSchema: 'addTask'
     }
   },
-  '/get-task/:taskId': {
+  '/task/:id': {
     get: {
       controller: 'relayer-controller',
       method: 'getTask'

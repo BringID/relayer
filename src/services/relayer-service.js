@@ -3,6 +3,7 @@ const logger = require('../utils/logger')
 const operationService = require('./operation-service')
 const relayerWalletService = require('./relayer-wallet-service')
 const transactionTrackerService = require('./transaction-tracker-service')
+const { NotFoundError } = require('../utils/errors')
 
 class RelayerService {
   async addTaskAndSendTx ({
@@ -65,7 +66,17 @@ class RelayerService {
     return lastTxHash
   }
 
-  async getTask ({ to, data, id }) {}
+  async getTask (id) {
+    const operation = await operationService.findById(id)
+    if (!operation) {
+      throw new NotFoundError('Operation not found', 'OPERATION_NOT_FOUND')
+    }
+
+    return {
+      txHash: this.getExistingTxHash(operation),
+      status: operation.status
+    }
+  }
 }
 
 module.exports = new RelayerService()

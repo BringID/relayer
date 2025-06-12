@@ -242,6 +242,15 @@ class RelayerWalletService {
       maxPriorityFeePerGas
     }
   }
+
+  async waitNBlocks (n) {
+    let currentBlock = await this.getBlockNumber()
+    const initialBlock = currentBlock
+    while ((currentBlock - initialBlock) <= n) {
+      currentBlock = await this.getNextBlock()
+    }
+    return currentBlock
+  }
 }
 
 module.exports = new RelayerWalletService()

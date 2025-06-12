@@ -1,5 +1,5 @@
 const stageConfig = require('../../stage-config')
-const operationService = require('./operation-service')
+const taskService = require('./task-service')
 const relayerWalletService = require('./relayer-wallet-service')
 const retryTransactionService = require('./retry-transaction-service')
 const logger = require('../utils/logger')
@@ -9,34 +9,25 @@ class TransactionTrackerService {
     this.trackers = {}
   }
 
-  async waitNBlocks (n) {
-    let currentBlock = await relayerWalletService.getBlockNumber()
-    const initialBlock = currentBlock
-    while ((currentBlock - initialBlock) <= n) {
-      currentBlock = await relayerWalletService.getNextBlock()
-    }
-    return currentBlock
-  }
-
-  async _trackPendingOperation (id, retry = true) {
-    await this.waitNBlocks(stageConfig.TRACKER_BLOCKS_TO_WAIT)
-    const operation = await operationService.findById(id)
-    const transactions = operation.transactions
+  async _trackPendingTask (id, retry = true) {
+    await relayerWalletService.waitNBlocks(stageConfig.TRACKER_BLOCKS_TO_WAIT)
+    const task = await taskService.findById(id)
+    const transactions = task.transactions
     let tx
     let receipt
 
     //check if it was mined for each transaction
     for (let i = 0; i < transactions.length; i++) {
       tx = transactions[i]
-      logger.debug(`Checking tx ${tx.hash} of operation ${id} to be mined...`)
+      logger.debug(`Checking tx ${tx.hash} of task ${id} to be mined...`)
 
       // if mined and waited for enough blocknumbers
       receipt = await relayerWalletService.getTransactionReceipt(tx.hash)
       if (receipt) {
-        await this.waitNBlocks(stageConfig.TRACKER_BLOCKS_TO_WAIT)
+        await relayerWalletService.waitNBlocks(stageConfig.TRACKER_BLOCKS_TO_WAIT)
         receipt = await relayerWalletService.getTransactionReceipt(tx.hash)
         if (receipt) {
-          return await operationService.updateOnTransactionMined(id, tx.hash, receipt)
+          return await taskService.updateOnTransactionMined(id, tx.hash, receipt)
         }
       }
     }
@@ -61,17 +52,17 @@ class TransactionTrackerService {
       }
     }
 
-    return await this._trackPendingOperation(id, retry)
+    return await this._trackPendingTask(id, retry)
   }
 
-  async trackPendingOperation (id, retry = true) {
-    logger.debug(`Adding operation ${id} to trackers.`)
+  async trackPendingTask (id, retry = true) {
+    logger.debug(`Adding task ${id} to trackers.`)
     if (!this.trackers[id]) {
       this.trackers[id] = true
-      await this._trackPendingOperation(id, retry)
+      await this._trackPendingTask(id, retry)
       this.trackers[id] = false
     } else {
-      logger.warn(`Tracker not started for operation ${id}, as it's already being tracked.`)
+      logger.warn(`Tracker not started for task ${id}, as it's already being tracked.`)
     }
   }
 }

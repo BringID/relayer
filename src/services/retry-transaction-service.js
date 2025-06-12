@@ -1,12 +1,12 @@
 const { ethers } = require('ethers')
 const logger = require('../utils/logger')
-const operationService = require('./operation-service')
+const taskService = require('./task-service')
 const relayerWalletService = require('./relayer-wallet-service')
 
 class RetryTransactionService {
   async retryTransaction (id) {
-    const operation = await operationService.findById(id)
-    const transaction = operation.transactions[operation.transactions.length - 1].toObject()
+    const task = await taskService.findById(id)
+    const transaction = task.transactions[task.transactions.length - 1].toObject()
     const {
       maxFeePerGas,
       maxPriorityFeePerGas
@@ -19,15 +19,15 @@ class RetryTransactionService {
       data,
       gasLimit,
       maxFeePerGas,
+      nonce: task.nonce,
       maxPriorityFeePerGas,
-      nonce: operation.nonce,
       value: ethers.parseUnits(value).toString()
     }
 
     const newTx = await relayerWalletService.sendRetryTransaction(params)
-    logger.warn(`Operation ${id}: re-submitted transaction. New tx: ${newTx.hash}`)
+    logger.warn(`Task ${id}: re-submitted transaction. New tx: ${newTx.hash}`)
 
-    operationService.addTransaction(id, newTx)
+    taskService.addTransaction(id, newTx)
     return newTx
   }
 }

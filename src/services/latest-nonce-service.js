@@ -1,6 +1,6 @@
 const stageConfig = require('../../stage-config')
 const ethers = require('ethers')
-const Operation = require('../models/operation')
+const Task = require('../models/task')
 
 class LatestNonceService {
   constructor () {
@@ -12,11 +12,11 @@ class LatestNonceService {
     const params = {}
     params.from = from.toLowerCase()
     if (mined) params.mined = true
-    const latestOp = await Operation.find(params).sort({ _id: -1 }).limit(1)
-    if (latestOp.length === 0 || !latestOp[0].nonce) {
+    const latestTask = await Task.find(params).sort({ _id: -1 }).limit(1)
+    if (latestTask.length === 0 || !latestTask[0].nonce) {
       return -1
     }
-    return latestOp[0].nonce
+    return latestTask[0].nonce
   }
 
   async getLatestNonceInDB ({ from, mined = false }) {

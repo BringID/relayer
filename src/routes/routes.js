@@ -1,9 +1,9 @@
 const routes = {
-  '/add-task': {
+  '/execute-task': {
     post: {
       controller: 'relayer-controller',
-      method: 'addTask'
-      // celebrateSchema: 'addTask'
+      method: 'executeTask'
+      // celebrateSchema: 'executeTask'
     }
   },
   '/task/:id': {

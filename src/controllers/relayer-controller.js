@@ -1,10 +1,10 @@
 const relayerService = require('../services/relayer-service')
 const logger = require('../utils/logger')
 
-const addTask = async (req, res) => {
+const executeTask = async (req, res) => {
   logger.json({
     controller: 'relayer-controller',
-    method: 'addTask',
+    method: 'executeTask',
     params: req.body
   })
 
@@ -15,7 +15,7 @@ const addTask = async (req, res) => {
     value: req.body.value || '0'
   }
 
-  const txHash = await relayerService.addTaskAndSendTx(params)
+  const txHash = await relayerService.executeTask(params)
 
   res.json({
     success: true,
@@ -40,6 +40,6 @@ const getTask = async (req, res) => {
 }
 
 module.exports = {
-  addTask,
-  getTask
+  getTask,
+  executeTask
 }

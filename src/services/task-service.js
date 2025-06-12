@@ -40,7 +40,7 @@ class TaskService {
     if (status === 'completed' || 'error') {
       task.mined = true
     } else {
-      operation.mined = false
+      task.mined = false
     }
     await task.save()
 

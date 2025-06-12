@@ -1,7 +1,7 @@
 {
   "NONCE_EXPIRED": { "warn": true },
   "APPROVE_FAILED": { "warn": true },
-  "OPERATION_NOT_FOUND": { "warn": true },
+  "TASK_NOT_FOUND": { "warn": true },
   "UNAUTHORIZED_REQUEST": { "warn": true },
   "REPLACEMENT_UNDERPRICED": { "warn": true },
   "TRANSACTION_RECEIPT_IS_NULL": { "warn": true },

@@ -6,7 +6,7 @@ const transactionTrackerService = require('./transaction-tracker-service')
 const { NotFoundError } = require('../utils/errors')
 
 class RelayerService {
-  async addTaskAndSendTx ({
+  async executeTask ({
     id,
     to,
     data,
@@ -69,7 +69,7 @@ class RelayerService {
   async getTask (id) {
     const task = await taskService.findById(id)
     if (!task) {
-      throw new NotFoundError('Operation not found', 'OPERATION_NOT_FOUND')
+      throw new NotFoundError('Task not found', 'TASK_NOT_FOUND')
     }
 
     return {

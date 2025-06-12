@@ -1,6 +1,6 @@
 const mongoose = require('mongoose')
 
-// Ethereum transaction schema (used in Operation Schema)
+// Ethereum transaction schema (used in Task Schema)
 const TransactionSchema = new mongoose.Schema(
   {
     // tx hash

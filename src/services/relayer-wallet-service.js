@@ -110,10 +110,6 @@ class RelayerWalletService {
   }
 
   async fetchFeeData () {
-    if (stageConfig.GAS_STATION) {
-      return await this.fetchGasStationFeeData()
-    }
-
     if (stageConfig.OPSTACK === 'true') {
       return this.fetchGasPrice()
     }
@@ -136,29 +132,6 @@ class RelayerWalletService {
     return {
       maxFeePerGas,
       maxPriorityFeePerGas
-    }
-  }
-
-  async fetchGasStationFeeData () {
-    let feeData
-    try {
-      const res = await fetch(stageConfig.GAS_STATION)
-      feeData = await res.json()
-      let {
-        maxFee,
-        maxPriorityFee
-      } = feeData[stageConfig.GAS_STATION_GAS_PRICE_LEVEL]
-
-      maxFee = ethers.parseUnits(parseFloat(maxFee).toFixed(0), 'gwei')
-      maxPriorityFee = ethers.parseUnits(parseFloat(maxPriorityFee).toFixed(0), 'gwei')
-
-      return {
-        maxFeePerGas: maxFee,
-        maxPriorityFeePerGas: maxPriorityFee
-      }
-    } catch (err) {
-      logger.error(`Catch an error while fetching fee from gas station. Default fee data will used. Reason: ${err.message}`)
-      return this.getDefaultFeeData()
     }
   }
 

@@ -16,10 +16,8 @@ if (stageConfig.RELAYER_PRIVATE_KEY == null || stageConfig.RELAYER_PRIVATE_KEY =
 
 class AutoNonceWallet extends ethers.Wallet {
   async sendTransaction (transaction) {
-    if (stageConfig.CHAIN_ID !== '42161') {
-      // hardcode gas limit to 350k
-      transaction.gasLimit = 350000
-    }
+    // hardcode gas limit to 350k
+    transaction.gasLimit = 350000
 
     const isNonceNew = transaction.nonce == null
     if (isNonceNew) {

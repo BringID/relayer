@@ -18,12 +18,12 @@ const executeOperation = async (req, res) => {
   }
   console.log('params', params)
 
-  const txHash = await relayerService.executeOperation(params)
+  const result = await relayerService.executeOperation(params)
 
   res.json({
     success: true,
-    tx_hash: txHash,
-    operation_id: Date.now().toString()
+    tx_hash: result.txHash,
+    operation_id: result.operationId
   })
 }
 

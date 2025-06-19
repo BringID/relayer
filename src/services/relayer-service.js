@@ -7,14 +7,14 @@ const { NotFoundError } = require('../utils/errors')
 
 class RelayerService {
   async executeOperation ({
-    batchId,
     to,
     type,
     data,
-    value
+    value,
+    batchId
   }) {
     const operationId = operationService._computeId({ type, contactAddress: to, batchId })
-    const operation = await operationService.findById(operationId)
+    let operation = await operationService.findById(operationId)
     if (operation?.transactions) {
       logger.info(`Existing operation found: ${operation.id}. Operation status - ${operation.status}`)
       return this.getExistingTxHash(operation)
@@ -32,23 +32,27 @@ class RelayerService {
     ]
     const [tx, blockNumber] = await Promise.all(promises)
 
-    logger.info('Submitted claim tx: ' + tx.hash)
+    logger.info('Submitted tx: ' + tx.hash)
+
     if (!operation) {
-      await operationService.create({
-        id,
-        to,
+      operation = await operationService.create({
         type,
         data,
+        batchId,
         nonce: tx.nonce,
+        contractAddress: to,
         txStarted: blockNumber
       })
     }
 
     // add transaction details to database
-    await operationService.addTransaction(newOperation.id, tx, to)
-    transactionTrackerService.trackPendingOperation(newOperation.id)
+    await operationService.addTransaction(operation.id, tx, to)
+    transactionTrackerService.trackPendingOperation(operation.id)
 
-    return tx.hash
+    return {
+      txHash: tx.hash,
+      operationId: operation.id
+    }
   }
 
   getExistingTxHash (operation) {

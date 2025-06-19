@@ -10,9 +10,10 @@ const executeOperation = async (req, res) => {
   console.log('req.body', req.body)
 
   const params = {
-    id: req.body.id,
     to: req.body.to,
+    type: req.body.type,
     data: req.body.data,
+    batchId: req.body.batch_id,
     value: req.body.value || '0'
   }
   console.log('params', params)

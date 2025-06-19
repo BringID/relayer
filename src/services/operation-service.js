@@ -2,10 +2,8 @@ const logger = require('../utils/logger')
 const Operation = require('../models/operation')
 
 class OperationService {
-  _computeId ({ type }) {
-    const timestamp = Date.now()
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
-    return `${type}-${timestamp}-${random}`
+  _computeId ({ type, contractAddress, batchId }) {
+    return `${type}-${batchId}-${contractAddress}`
   }
 
   async findById (id) {
@@ -21,18 +19,21 @@ class OperationService {
   }
 
   async create ({
-    // id,
+    type,
     data,
     nonce,
-    claimStarted,
+    batchId,
+    txStarted,
+    contractAddress,
     status = 'created'
   }) {
     const operation = await Operation.create({
-      id: this._computeId({ type: 'verification' }),
+      id: this._computeId({ type, batchId, contractAddress }),
       data,
       nonce,
       status,
-      claimStarted,
+      txStarted,
+      contractAddress,
       transactions: []
     })
 
@@ -60,7 +61,7 @@ class OperationService {
     const operation = await this.findById(id)
     const status = receipt.status === 1 ? 'completed' : 'error'
     operation.status = status
-    operation.claimCompleted = receipt.blockNumber
+    operation.txMined = receipt.blockNumber
     operation.mined = true
 
     operation.transactions.map(tx => {

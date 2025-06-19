@@ -17,6 +17,10 @@ const OperationSchema = new mongoose.Schema(
       default: 'created',
       enum: ['created', 'pending', 'completed', 'canceled', 'error', 'dropped']
     },
+    contractAddress: {
+      type: String,
+      required: true
+    },
     mined: {
       type: Boolean,
       default: false

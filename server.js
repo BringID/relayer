@@ -15,7 +15,7 @@ const asyncHandler = require('express-async-handler')
 const errorToWarn = require('./configs/error-to-warn.json')
 const { requestValidator } = require('./src/utils/request-validator')
 const { reInitNonceQueueScheduler } = require('./tasks/nonce-queue-reinit-scheduler')
-const { pendingTaskRetryScheduler } = require('./tasks/pending-task-retry-scheduler')
+const { pendingOperationRetryScheduler } = require('./tasks/pending-operation-retry-scheduler')
 
 // Apply middlewares
 app.use(express.urlencoded({ extended: false }))
@@ -39,7 +39,7 @@ connectDB(
       logger.info(`Server is up on port ${PORT}\n`)
       if (stageConfig.NODE_ENV === 'production') {
         reInitNonceQueueScheduler()
-        pendingTaskRetryScheduler()
+        pendingOperationRetryScheduler()
       }
     })
   })

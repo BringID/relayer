@@ -1,5 +1,5 @@
 const stageConfig = require('../../stage-config')
-const taskService = require('./task-service')
+const operationService = require('./operation-service')
 const relayerWalletService = require('./relayer-wallet-service')
 const retryTransactionService = require('./retry-transaction-service')
 const logger = require('../utils/logger')
@@ -9,17 +9,17 @@ class TransactionTrackerService {
     this.trackers = {}
   }
 
-  async _trackPendingTask (id, retry = true) {
+  async _trackPendingOperation (id, retry = true) {
     await relayerWalletService.waitNBlocks(stageConfig.TRACKER_BLOCKS_TO_WAIT)
-    const task = await taskService.findById(id)
-    const transactions = task.transactions
+    const operation = await operationService.findById(id)
+    const transactions = operation.transactions
     let tx
     let receipt
 
     //check if it was mined for each transaction
     for (let i = 0; i < transactions.length; i++) {
       tx = transactions[i]
-      logger.debug(`Checking tx ${tx.hash} of task ${id} to be mined...`)
+      logger.debug(`Checking tx ${tx.hash} of operation ${id} to be mined...`)
 
       // if mined and waited for enough blocknumbers
       receipt = await relayerWalletService.getTransactionReceipt(tx.hash)
@@ -27,7 +27,7 @@ class TransactionTrackerService {
         await relayerWalletService.waitNBlocks(stageConfig.TRACKER_BLOCKS_TO_WAIT)
         receipt = await relayerWalletService.getTransactionReceipt(tx.hash)
         if (receipt) {
-          return await taskService.updateOnTransactionMined(id, tx.hash, receipt)
+          return await operationService.updateOnTransactionMined(id, tx.hash, receipt)
         }
       }
     }
@@ -52,17 +52,17 @@ class TransactionTrackerService {
       }
     }
 
-    return await this._trackPendingTask(id, retry)
+    return await this._trackPendingOperation(id, retry)
   }
 
-  async trackPendingTask (id, retry = true) {
-    logger.debug(`Adding task ${id} to trackers.`)
+  async trackPendingOperation (id, retry = true) {
+    logger.debug(`Adding operation ${id} to trackers.`)
     if (!this.trackers[id]) {
       this.trackers[id] = true
-      await this._trackPendingTask(id, retry)
+      await this._trackPendingOperation(id, retry)
       this.trackers[id] = false
     } else {
-      logger.warn(`Tracker not started for task ${id}, as it's already being tracked.`)
+      logger.warn(`Tracker not started for operation ${id}, as it's already being tracked.`)
     }
   }
 }

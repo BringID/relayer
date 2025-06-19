@@ -1,7 +1,7 @@
 const { celebrate, Joi, Segments } = require('celebrate')
 
 const celebrateMiddleware = celebrateSchema => {
-  if (celebrateSchema === 'executeTask') {
+  if (celebrateSchema === 'executeOperation') {
     return celebrate({
       [Segments.HEADERS]: Joi.object({
         customer: Joi.string().optional().messages({

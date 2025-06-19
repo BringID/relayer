@@ -1,21 +1,21 @@
 const { ethers } = require('ethers')
 const logger = require('../utils/logger')
-const taskService = require('./task-service')
+const operationService = require('./operation-service')
 const relayerWalletService = require('./relayer-wallet-service')
 const transactionTrackerService = require('./transaction-tracker-service')
 const { NotFoundError } = require('../utils/errors')
 
 class RelayerService {
-  async executeTask ({
+  async executeOperation ({
     id,
     to,
     data,
     value
   }) {
-    const task = await taskService.findById(id)
-    if (task?.transactions) {
-      logger.info(`Existing task found: ${task.id}. Task status - ${task.status}`)
-      return this.getExistingTxHash(task)
+    const operation = await operationService.findById(id)
+    if (operation?.transactions) {
+      logger.info(`Existing operation found: ${operation.id}. Operation status - ${operation.status}`)
+      return this.getExistingTxHash(operation)
     }
 
     const txParams = { 
@@ -24,7 +24,6 @@ class RelayerService {
       value: ethers.parseUnits(value)
     }
 
-
     const promises = [
       relayerWalletService.sendTransaction(txParams), 
       relayerWalletService.getBlockNumber()
@@ -32,9 +31,9 @@ class RelayerService {
     const [tx, blockNumber] = await Promise.all(promises)
 
     logger.info('Submitted claim tx: ' + tx.hash)
-
-    if (!task) {
-      await taskService.create({
+    let newOperation
+    if (!operation) {
+      newOperation = await operationService.create({
         id,
         data,
         nonce: tx.nonce,
@@ -43,38 +42,38 @@ class RelayerService {
     }
 
     // add transaction details to database
-    await taskService.addTransaction(id, tx)
-    transactionTrackerService.trackPendingTask(id)
+    await operationService.addTransaction(newOperation.id, tx, to)
+    transactionTrackerService.trackPendingOperation(newOperation.id)
 
     return tx.hash
   }
 
-  getExistingTxHash (task) {
-    const completedTx = this._getCompletedTx(task)
-    if (!completedTx.length) return this._getLastTxHash(task)
+  getExistingTxHash (operation) {
+    const completedTx = this._getCompletedTx(operation)
+    if (!completedTx.length) return this._getLastTxHash(operation)
 
     return completedTx[0].hash
   }
 
-  _getCompletedTx (task) {
-    return task.transactions.filter(tx => tx.status === 'completed')
+  _getCompletedTx (operation) {
+    return operation.transactions.filter(tx => tx.status === 'completed')
   }
 
-  _getLastTxHash (task) {
-    const tx = task.transactions[task.transactions.length - 1]
+  _getLastTxHash (operation) {
+    const tx = operation.transactions[operation.transactions.length - 1]
     const lastTxHash = tx.hash
     return lastTxHash
   }
 
-  async getTask (id) {
-    const task = await taskService.findById(id)
-    if (!task) {
-      throw new NotFoundError('Task not found', 'TASK_NOT_FOUND')
+  async getOperation (id) {
+    const operation = await operationService.findById(id)
+    if (!operation) {
+      throw new NotFoundError('Operation not found', 'OPERATION_NOT_FOUND')
     }
 
     return {
-      txHash: this.getExistingTxHash(task),
-      status: task.status
+      txHash: this.getExistingTxHash(operation),
+      status: operation.status
     }
   }
 }

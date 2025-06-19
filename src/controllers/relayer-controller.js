@@ -1,12 +1,13 @@
 const relayerService = require('../services/relayer-service')
 const logger = require('../utils/logger')
 
-const executeTask = async (req, res) => {
+const executeOperation = async (req, res) => {
   logger.json({
     controller: 'relayer-controller',
-    method: 'executeTask',
+    method: 'executeOperation',
     params: req.body
   })
+  console.log('req.body', req.body)
 
   const params = {
     id: req.body.id,
@@ -14,23 +15,25 @@ const executeTask = async (req, res) => {
     data: req.body.data,
     value: req.body.value || '0'
   }
+  console.log('params', params)
 
-  const txHash = await relayerService.executeTask(params)
+  const txHash = await relayerService.executeOperation(params)
 
   res.json({
     success: true,
-    tx_hash: txHash
+    tx_hash: txHash,
+    operation_id: Date.now().toString()
   })
 }
 
-const getTask = async (req, res) => {
+const getOperation = async (req, res) => {
   logger.json({
     controller: 'relayer-controller',
-    method: 'getTask',
+    method: 'getOperation',
     id: req.params.id
   })
 
-  const result = await relayerService.getTask(req.params.id)
+  const result = await relayerService.getOperation(req.params.id)
 
   res.json({
     success: true,
@@ -40,6 +43,6 @@ const getTask = async (req, res) => {
 }
 
 module.exports = {
-  getTask,
-  executeTask
+  getOperation,
+  executeOperation
 }

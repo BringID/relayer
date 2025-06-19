@@ -1,16 +1,16 @@
 const routes = {
-  '/execute-task': {
+  '/execute-operation': {
     post: {
       controller: 'relayer-controller',
-      method: 'executeTask'
-      // celebrateSchema: 'executeTask'
+      method: 'executeOperation'
+      // celebrateSchema: 'executeOperation'
     }
   },
-  '/task/:id': {
+  '/operation/:id': {
     get: {
       controller: 'relayer-controller',
-      method: 'getTask'
-      // celebrateSchema: 'getTask'
+      method: 'getOperation'
+      // celebrateSchema: 'getOperation'
     }
   }
 }

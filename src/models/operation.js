@@ -1,7 +1,7 @@
 const mongoose = require('mongoose')
 const TransactionSchema = require('./transaction')
 
-const TaskSchema = new mongoose.Schema(
+const OperationSchema = new mongoose.Schema(
   {
     id: {
       type: String,
@@ -37,8 +37,8 @@ const TaskSchema = new mongoose.Schema(
   }
 )
 
-TaskSchema.index({ id: 1 })
-TaskSchema.index({ nonce: 1, id: 1 }, { unique: true })
+OperationSchema.index({ id: 1 })
+OperationSchema.index({ nonce: 1, id: 1 }, { unique: true })
 
-const Task = mongoose.model('Task', TaskSchema)
-module.exports = Task
+const Operation = mongoose.model('Operation', OperationSchema)
+module.exports = Operation

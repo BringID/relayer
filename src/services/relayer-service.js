@@ -7,17 +7,19 @@ const { NotFoundError } = require('../utils/errors')
 
 class RelayerService {
   async executeOperation ({
+    id,
     to,
-    type,
     data,
-    value,
-    batchId
+    value
   }) {
-    const operationId = operationService._computeId({ type, contactAddress: to, batchId })
-    let operation = await operationService.findById(operationId)
+    let operation = await operationService.findById(id)
     if (operation?.transactions) {
       logger.info(`Existing operation found: ${operation.id}. Operation status - ${operation.status}`)
-      return this.getExistingTxHash(operation)
+      return {
+        txHash: this.getExistingTxHash(operation),
+        operationId: operation.id,
+        status: operation.status
+      }
     }
 
     const txParams = { 
@@ -36,9 +38,8 @@ class RelayerService {
 
     if (!operation) {
       operation = await operationService.create({
-        type,
+        id,
         data,
-        batchId,
         nonce: tx.nonce,
         contractAddress: to,
         txStarted: blockNumber
@@ -46,12 +47,13 @@ class RelayerService {
     }
 
     // add transaction details to database
-    await operationService.addTransaction(operation.id, tx, to)
+    const pendingOperation = await operationService.addTransaction(operation.id, tx, to)
     transactionTrackerService.trackPendingOperation(operation.id)
 
     return {
       txHash: tx.hash,
-      operationId: operation.id
+      operationId: operation.id,
+      status: pendingOperation.status
     }
   }
 
@@ -72,7 +74,7 @@ class RelayerService {
     return lastTxHash
   }
 
-  async getOperation (id) {
+  async getOperationStatus (id) {
     const operation = await operationService.findById(id)
     if (!operation) {
       throw new NotFoundError('Operation not found', 'OPERATION_NOT_FOUND')
@@ -80,7 +82,8 @@ class RelayerService {
 
     return {
       txHash: this.getExistingTxHash(operation),
-      status: operation.status
+      status: operation.status,
+      operationId: operation.id
     }
   }
 }

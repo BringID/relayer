@@ -2,10 +2,6 @@ const logger = require('../utils/logger')
 const Operation = require('../models/operation')
 
 class OperationService {
-  _computeId ({ type, contractAddress, batchId }) {
-    return `${type}-${batchId}-${contractAddress}`
-  }
-
   async findById (id) {
     return await Operation.findOne({ id })
   }
@@ -19,16 +15,15 @@ class OperationService {
   }
 
   async create ({
-    type,
+    id,
     data,
     nonce,
-    batchId,
     txStarted,
     contractAddress,
     status = 'created'
   }) {
     const operation = await Operation.create({
-      id: this._computeId({ type, batchId, contractAddress }),
+      id,
       data,
       nonce,
       status,

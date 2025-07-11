@@ -16,9 +16,6 @@ if (stageConfig.RELAYER_PRIVATE_KEY == null || stageConfig.RELAYER_PRIVATE_KEY =
 
 class AutoNonceWallet extends ethers.Wallet {
   async sendTransaction (transaction) {
-    // hardcode gas limit to 350k
-    transaction.gasLimit = 350000
-
     const isNonceNew = transaction.nonce == null
     if (isNonceNew) {
       transaction.nonce = await nonceQueueService.getNextNonce()

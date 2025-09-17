@@ -18,7 +18,7 @@ class AutoNonceWallet extends ethers.Wallet {
   async sendTransaction (transaction) {
     // if (stageConfig.CHAIN_ID !== '84532') {
       // hardcode gas limit to 1500k
-      transaction.gasLimit = 1500000
+      transaction.gasLimit = 3000000
     // }
 
     const isNonceNew = transaction.nonce == null

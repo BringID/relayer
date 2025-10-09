@@ -28,6 +28,8 @@ class RelayerService {
       value: ethers.parseUnits(value)
     }
 
+    await relayerWalletService.simulateCall(txParams)
+
     const promises = [
       relayerWalletService.sendTransaction(txParams), 
       relayerWalletService.getBlockNumber()

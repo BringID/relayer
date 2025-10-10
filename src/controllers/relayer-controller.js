@@ -11,6 +11,7 @@ const executeOperation = async (req, res) => {
   const params = {
     id: req.body.id,
     to: req.body.to,
+    type: req.body.type,
     data: req.body.data,
     value: req.body.value || '0'
   }

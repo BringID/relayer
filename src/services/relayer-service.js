@@ -9,6 +9,7 @@ class RelayerService {
   async executeOperation ({
     id,
     to,
+    type,
     data,
     value
   }) {
@@ -28,7 +29,9 @@ class RelayerService {
       value: ethers.parseUnits(value)
     }
 
-    await relayerWalletService.simulateCall(txParams)
+    if (type === 'claim') {
+      await relayerWalletService.simulateCall(txParams)
+    }
 
     const promises = [
       relayerWalletService.sendTransaction(txParams), 

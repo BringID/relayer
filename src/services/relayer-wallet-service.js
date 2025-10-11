@@ -93,6 +93,24 @@ class RelayerWalletService {
     return await this.relayerWallet.sendTransaction(transaction)
   }
 
+  async simulateCall({ to, data, value }) {
+    try {
+      // Simulate the transaction call
+      const result = await this.provider.call({
+        to,
+        data,
+        value: value || 0,
+        from: this.relayerWallet.address
+      })
+      return { success: true, result }
+    } catch (err) {
+      const reason = err?.reason || 'Unknown reason' 
+      const message = err?.message || 'Unknown message'
+      logger.error(`Error simulating transaction: Reason: ${reason}, Message: ${message}`)
+      throw new BadRequestError(`Error simulating transaction call`, 'SIMULATION_CALL_FAILED')
+    }
+  }
+
   async getBlockNumber () {
     return this.provider.getBlockNumber()
   }

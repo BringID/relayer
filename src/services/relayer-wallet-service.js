@@ -106,7 +106,7 @@ class RelayerWalletService {
     } catch (err) {
       const reason = err?.reason || 'Unknown reason' 
       const message = err?.message || 'Unknown message'
-      logger.error(`Error simulating transaction: Reason: ${reason}, Message: ${message}`)
+      logger.warn(`Error simulating transaction: Reason: ${reason}, Message: ${message}`)
       throw new BadRequestError(`Error simulating transaction call`, 'SIMULATION_CALL_FAILED')
     }
   }

@@ -29,9 +29,9 @@ class RelayerService {
       value: ethers.parseUnits(value)
     }
 
-    if (type === 'claim') {
-      await relayerWalletService.simulateCall(txParams)
-    }
+    // if (type === 'claim') {
+    //   await relayerWalletService.simulateCall(txParams)
+    // }
 
     const promises = [
       relayerWalletService.sendTransaction(txParams), 

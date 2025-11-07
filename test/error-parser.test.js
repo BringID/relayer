@@ -1,0 +1,284 @@
+/* eslint-disable */
+const { expect } = require('chai')
+const { Interface } = require('ethers')
+const proxyquire = require('proxyquire')
+const sinon = require('sinon')
+const { BadRequestError } = require('../src/utils/errors')
+const airdropErrorsABI = require('../contracts/airdrop-errors.json')
+
+describe('ErrorParser', () => {
+  let errorParser
+  let loggerStub
+  let iface
+
+  before(() => {
+    // Create Interface for generating error data
+    iface = new Interface(airdropErrorsABI)
+  })
+
+  beforeEach(() => {
+    // Mock logger
+    loggerStub = {
+      info: sinon.stub(),
+      warn: sinon.stub(),
+      error: sinon.stub()
+    }
+
+    // Load error parser with mocked logger
+    const ErrorParserModule = proxyquire('../src/utils/error-parser', {
+      './logger': loggerStub
+    })
+
+    // Get the singleton instance
+    errorParser = ErrorParserModule
+  })
+
+  afterEach(() => {
+    sinon.restore()
+  })
+
+  describe('parseContractError', () => {
+    describe('when error data is missing', () => {
+      it('should throw SIMULATION_CALL_FAILED when error has no data', () => {
+        const err = {
+          reason: 'Some reason',
+          message: 'Some message'
+        }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError, 'Error simulating transaction call')
+
+        expect(loggerStub.warn.calledOnce).to.be.true
+        expect(loggerStub.warn.firstCall.args[0]).to.include('Error simulating transaction')
+      })
+
+      it('should throw SIMULATION_CALL_FAILED when error is null', () => {
+        const err = null
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError, 'Error simulating transaction call')
+      })
+    })
+
+    describe('when error data exists and can be parsed', () => {
+      it('should parse AirdropClaimed error correctly', () => {
+        const testAddress = '0x1234567890123456789012345678901234567890'
+        const errorData = iface.encodeErrorResult('AirdropClaimed', [testAddress])
+        const err = { data: errorData }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError)
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error).to.be.instanceOf(BadRequestError)
+          expect(error.cause).to.equal('AIRDROP_ALREADY_CLAIMED')
+          expect(error.message).to.include(testAddress)
+          expect(loggerStub.warn.called).to.be.true
+        }
+      })
+
+      it('should parse AirdropStopped error correctly', () => {
+        const errorData = iface.encodeErrorResult('AirdropStopped', [])
+        const err = { data: errorData }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError)
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error).to.be.instanceOf(BadRequestError)
+          expect(error.cause).to.equal('AIRDROP_STOPPED')
+          expect(error.message).to.equal('Airdrop is currently stopped')
+        }
+      })
+
+      it('should parse AmountIsZero error correctly', () => {
+        const errorData = iface.encodeErrorResult('AmountIsZero', [])
+        const err = { data: errorData }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError)
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error).to.be.instanceOf(BadRequestError)
+          expect(error.cause).to.equal('AMOUNT_IS_ZERO')
+          expect(error.message).to.equal('Amount is zero')
+        }
+      })
+
+      it('should parse InsufficientScore error correctly', () => {
+        const testScore = 100n
+        const errorData = iface.encodeErrorResult('InsufficientScore', [testScore])
+        const err = { data: errorData }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError)
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error).to.be.instanceOf(BadRequestError)
+          expect(error.cause).to.equal('INSUFFICIENT_SCORE')
+          expect(error.message).to.include('100')
+          expect(error.message).to.include('Insufficient score')
+        }
+      })
+
+      it('should parse ThresholdIsZero error correctly', () => {
+        const errorData = iface.encodeErrorResult('ThresholdIsZero', [])
+        const err = { data: errorData }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError)
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error).to.be.instanceOf(BadRequestError)
+          expect(error.cause).to.equal('THRESHOLD_IS_ZERO')
+          expect(error.message).to.equal('Threshold is zero')
+        }
+      })
+
+      it('should parse TransferFailed error correctly', () => {
+        const errorData = iface.encodeErrorResult('TransferFailed', [])
+        const err = { data: errorData }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError)
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error).to.be.instanceOf(BadRequestError)
+          expect(error.cause).to.equal('TRANSFER_FAILED')
+          expect(error.message).to.equal('Token transfer failed')
+        }
+      })
+
+      it('should handle error data from err.error.data', () => {
+        const testAddress = '0x1234567890123456789012345678901234567890'
+        const errorData = iface.encodeErrorResult('AirdropClaimed', [testAddress])
+        const err = {
+          error: {
+            data: errorData
+          }
+        }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError)
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error.cause).to.equal('AIRDROP_ALREADY_CLAIMED')
+        }
+      })
+    })
+
+    describe('when error cannot be parsed', () => {
+      it('should throw SIMULATION_CALL_FAILED when parseError returns null', () => {
+        // Create invalid error data (wrong selector)
+        const errorData = '0x12345678' + '0'.repeat(64)
+        const err = { data: errorData }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError, 'Error simulating transaction call')
+
+        expect(loggerStub.warn.called).to.be.true
+      })
+
+      it('should throw SIMULATION_CALL_FAILED when error data is malformed', () => {
+        const errorData = '0xinvalid'
+        const err = { data: errorData }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError, 'Error simulating transaction call')
+      })
+    })
+
+    describe('when contract interface is not found', () => {
+      it('should throw SIMULATION_CALL_FAILED for unknown contract', () => {
+        const testAddress = '0x1234567890123456789012345678901234567890'
+        const errorData = iface.encodeErrorResult('AirdropClaimed', [testAddress])
+        const err = { data: errorData }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'unknown-contract')
+        }).to.throw(BadRequestError, 'Error simulating transaction call')
+
+        expect(loggerStub.warn.called).to.be.true
+        expect(loggerStub.warn.firstCall.args[0]).to.include('Interface not found')
+      })
+    })
+
+    describe('when error is not in ERROR_MAPPING', () => {
+      it('should throw CONTRACT_ERROR for unmapped error', () => {
+        // Create a mock interface that returns an unknown error
+        const mockIface = {
+          parseError: sinon.stub().returns({
+            name: 'UnknownError',
+            args: [],
+            signature: 'UnknownError()'
+          })
+        }
+
+        // Replace the interface temporarily
+        const originalInterface = errorParser.interfaces.airdrop
+        errorParser.interfaces.airdrop = mockIface
+
+        const err = { data: '0x1234' }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError)
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error.cause).to.equal('CONTRACT_ERROR')
+          expect(error.message).to.include('UnknownError')
+          expect(loggerStub.warn.called).to.be.true
+        } finally {
+          // Restore original interface
+          errorParser.interfaces.airdrop = originalInterface
+        }
+      })
+    })
+
+    describe('default contract name', () => {
+      it('should use "airdrop" as default contract name', () => {
+        const testAddress = '0x1234567890123456789012345678901234567890'
+        const errorData = iface.encodeErrorResult('AirdropClaimed', [testAddress])
+        const err = { data: errorData }
+
+        expect(() => {
+          errorParser.parseContractError(err) // No contract name provided
+        }).to.throw(BadRequestError)
+
+        try {
+          errorParser.parseContractError(err)
+        } catch (error) {
+          expect(error.cause).to.equal('AIRDROP_ALREADY_CLAIMED')
+        }
+      })
+    })
+  })
+})
+

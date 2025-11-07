@@ -61,16 +61,21 @@ describe('OperationService', () => {
   })
 
   function getOperationData(overrides = {}) {
-    return {
+    const defaults = {
       nonce: 123,
       status: 'created',
       data: '0x1234dataTest',
       contractAddress: '0x123',
       batchId: '123',
       type: 'verification',
-      txStarted: 123,
-      ...overrides
+      txStarted: 123
     }
+    const data = { ...defaults, ...overrides }
+    // Generate id if not provided
+    if (!data.id) {
+      data.id = `${data.type}-${data.batchId}-${data.contractAddress}`
+    }
+    return data
   }
 
   function expectOperationStructure(operation, expected) {

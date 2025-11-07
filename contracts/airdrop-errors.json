@@ -1,0 +1,45 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      }
+    ],
+    "name": "AirdropClaimed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "AirdropStopped",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "AmountIsZero",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "score",
+        "type": "uint256"
+      }
+    ],
+    "name": "InsufficientScore",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ThresholdIsZero",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "TransferFailed",
+    "type": "error"
+  }
+]
+

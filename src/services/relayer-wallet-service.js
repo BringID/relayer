@@ -5,6 +5,7 @@ const stageConfig = require('../../stage-config')
 const nonceQueueService = require('./nonce-queue-service')
 const errorToWarn = require('../../configs/error-to-warn.json')
 const { BadRequestError } = require('../utils/errors')
+const errorParser = require('../utils/error-parser')
 
 if (stageConfig.JSON_RPC_URL == null || stageConfig.JSON_RPC_URL === '') {
   throw new Error('Please provide json rpc url')
@@ -104,10 +105,7 @@ class RelayerWalletService {
       })
       return { success: true, result }
     } catch (err) {
-      const reason = err?.reason || 'Unknown reason' 
-      const message = err?.message || 'Unknown message'
-      logger.warn(`Error simulating transaction: Reason: ${reason}, Message: ${message}`)
-      throw new BadRequestError(`Error simulating transaction call`, 'SIMULATION_CALL_FAILED')
+      errorParser.parseContractError(err, 'airdrop')
     }
   }
 

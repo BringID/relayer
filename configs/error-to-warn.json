@@ -1,9 +1,15 @@
 {
   "NONCE_EXPIRED": { "warn": true },
+  "AMOUNT_IS_ZERO": { "warn": true },
+  "AIRDROP_STOPPED": { "warn": true },
+  "TRANSFER_FAILED": { "warn": true },
+  "THRESHOLD_IS_ZERO": { "warn": true },
+  "INSUFFICIENT_SCORE": { "warn": true },
   "OPERATION_NOT_FOUND": { "warn": true },
   "UNAUTHORIZED_REQUEST": { "warn": true },
   "SIMULATION_CALL_FAILED": { "warn": true },
   "REPLACEMENT_UNDERPRICED": { "warn": true },
   "TRANSACTION_RECEIPT_IS_NULL": { "warn": true },
+  "AIRDROP_ALREADY_CLAIMED": { "warn": true },
   "API_SECRET_KEY_NOT_PROVIDED": { "silence": true }
 }

@@ -1,0 +1,74 @@
+[
+  {
+    "inputs": [],
+    "name": "LeafAlreadyExists",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "LeafCannotBeZero",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "LeafDoesNotExist",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "LeafGreaterThanSnarkScalarField",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Semaphore__CallerIsNotTheGroupAdmin",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Semaphore__CallerIsNotThePendingGroupAdmin",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Semaphore__GroupDoesNotExist",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Semaphore__GroupHasNoMembers",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Semaphore__InvalidProof",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Semaphore__MerkleTreeDepthIsNotSupported",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Semaphore__MerkleTreeRootIsExpired",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Semaphore__MerkleTreeRootIsNotPartOfTheGroup",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Semaphore__YouAreUsingTheSameNullifierTwice",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "WrongSiblingNodes",
+    "type": "error"
+  }
+]
+
+

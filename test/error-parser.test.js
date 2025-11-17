@@ -5,15 +5,18 @@ const proxyquire = require('proxyquire')
 const sinon = require('sinon')
 const { BadRequestError } = require('../src/utils/errors')
 const airdropErrorsABI = require('../contracts/airdrop-errors.json')
+const semaphoreErrorsABI = require('../contracts/semaphore-errors.json')
 
 describe('ErrorParser', () => {
   let errorParser
   let loggerStub
-  let iface
+  let airdropIface
+  let semaphoreIface
 
   before(() => {
-    // Create Interface for generating error data
-    iface = new Interface(airdropErrorsABI)
+    // Create Interfaces for generating error data
+    airdropIface = new Interface(airdropErrorsABI)
+    semaphoreIface = new Interface(semaphoreErrorsABI)
   })
 
   beforeEach(() => {
@@ -65,7 +68,7 @@ describe('ErrorParser', () => {
     describe('when error data exists and can be parsed', () => {
       it('should parse AirdropClaimed error correctly', () => {
         const testAddress = '0x1234567890123456789012345678901234567890'
-        const errorData = iface.encodeErrorResult('AirdropClaimed', [testAddress])
+        const errorData = airdropIface.encodeErrorResult('AirdropClaimed', [testAddress])
         const err = { data: errorData }
 
         expect(() => {
@@ -83,7 +86,7 @@ describe('ErrorParser', () => {
       })
 
       it('should parse AirdropStopped error correctly', () => {
-        const errorData = iface.encodeErrorResult('AirdropStopped', [])
+        const errorData = airdropIface.encodeErrorResult('AirdropStopped', [])
         const err = { data: errorData }
 
         expect(() => {
@@ -100,7 +103,7 @@ describe('ErrorParser', () => {
       })
 
       it('should parse AmountIsZero error correctly', () => {
-        const errorData = iface.encodeErrorResult('AmountIsZero', [])
+        const errorData = airdropIface.encodeErrorResult('AmountIsZero', [])
         const err = { data: errorData }
 
         expect(() => {
@@ -118,7 +121,7 @@ describe('ErrorParser', () => {
 
       it('should parse InsufficientScore error correctly', () => {
         const testScore = 100n
-        const errorData = iface.encodeErrorResult('InsufficientScore', [testScore])
+        const errorData = airdropIface.encodeErrorResult('InsufficientScore', [testScore])
         const err = { data: errorData }
 
         expect(() => {
@@ -136,7 +139,7 @@ describe('ErrorParser', () => {
       })
 
       it('should parse ThresholdIsZero error correctly', () => {
-        const errorData = iface.encodeErrorResult('ThresholdIsZero', [])
+        const errorData = airdropIface.encodeErrorResult('ThresholdIsZero', [])
         const err = { data: errorData }
 
         expect(() => {
@@ -153,7 +156,7 @@ describe('ErrorParser', () => {
       })
 
       it('should parse TransferFailed error correctly', () => {
-        const errorData = iface.encodeErrorResult('TransferFailed', [])
+        const errorData = airdropIface.encodeErrorResult('TransferFailed', [])
         const err = { data: errorData }
 
         expect(() => {
@@ -171,7 +174,7 @@ describe('ErrorParser', () => {
 
       it('should handle error data from err.error.data', () => {
         const testAddress = '0x1234567890123456789012345678901234567890'
-        const errorData = iface.encodeErrorResult('AirdropClaimed', [testAddress])
+        const errorData = airdropIface.encodeErrorResult('AirdropClaimed', [testAddress])
         const err = {
           error: {
             data: errorData
@@ -187,6 +190,59 @@ describe('ErrorParser', () => {
         } catch (error) {
           expect(error.cause).to.equal('AIRDROP_ALREADY_CLAIMED')
         }
+      })
+
+      describe('semaphore errors', () => {
+        it('should parse LeafAlreadyExists error when contractName is semaphore', () => {
+          const errorData = semaphoreIface.encodeErrorResult('LeafAlreadyExists', [])
+          const err = { data: errorData }
+
+          expect(() => {
+            errorParser.parseContractError(err, 'semaphore')
+          }).to.throw(BadRequestError)
+
+          try {
+            errorParser.parseContractError(err, 'semaphore')
+          } catch (error) {
+            expect(error).to.be.instanceOf(BadRequestError)
+            expect(error.cause).to.equal('LEAF_ALREADY_EXISTS')
+            expect(error.message).to.equal('Leaf already exists in the Merkle tree')
+          }
+        })
+
+        it('should parse Semaphore__InvalidProof error when contractName is semaphore', () => {
+          const errorData = semaphoreIface.encodeErrorResult('Semaphore__InvalidProof', [])
+          const err = { data: errorData }
+
+          expect(() => {
+            errorParser.parseContractError(err, 'semaphore')
+          }).to.throw(BadRequestError)
+
+          try {
+            errorParser.parseContractError(err, 'semaphore')
+          } catch (error) {
+            expect(error).to.be.instanceOf(BadRequestError)
+            expect(error.cause).to.equal('INVALID_PROOF')
+            expect(error.message).to.equal('Invalid Semaphore proof')
+          }
+        })
+
+        it('should fallback to semaphore errors when contractName is airdrop', () => {
+          const errorData = semaphoreIface.encodeErrorResult('Semaphore__GroupDoesNotExist', [])
+          const err = { data: errorData }
+
+          expect(() => {
+            errorParser.parseContractError(err, 'airdrop')
+          }).to.throw(BadRequestError)
+
+          try {
+            errorParser.parseContractError(err, 'airdrop')
+          } catch (error) {
+            expect(error).to.be.instanceOf(BadRequestError)
+            expect(error.cause).to.equal('GROUP_DOES_NOT_EXIST')
+            expect(error.message).to.equal('Group does not exist')
+          }
+        })
       })
     })
 
@@ -216,7 +272,7 @@ describe('ErrorParser', () => {
     describe('when contract interface is not found', () => {
       it('should throw SIMULATION_CALL_FAILED for unknown contract', () => {
         const testAddress = '0x1234567890123456789012345678901234567890'
-        const errorData = iface.encodeErrorResult('AirdropClaimed', [testAddress])
+        const errorData = airdropIface.encodeErrorResult('AirdropClaimed', [testAddress])
         const err = { data: errorData }
 
         expect(() => {
@@ -265,7 +321,7 @@ describe('ErrorParser', () => {
     describe('default contract name', () => {
       it('should use "airdrop" as default contract name', () => {
         const testAddress = '0x1234567890123456789012345678901234567890'
-        const errorData = iface.encodeErrorResult('AirdropClaimed', [testAddress])
+        const errorData = airdropIface.encodeErrorResult('AirdropClaimed', [testAddress])
         const err = { data: errorData }
 
         expect(() => {

@@ -2,6 +2,7 @@ const { ethers } = require('ethers')
 const logger = require('../utils/logger')
 const operationService = require('./operation-service')
 const relayerWalletService = require('./relayer-wallet-service')
+const stageConfig = require('../../stage-config')
 
 class RetryTransactionService {
   async retryTransaction (id) {
@@ -13,10 +14,7 @@ class RetryTransactionService {
 
   async prepareAndSendTransaction (operation) {
     const transaction = operation.transactions[operation.transactions.length - 1].toObject()
-    const {
-      maxFeePerGas,
-      maxPriorityFeePerGas
-    } = await relayerWalletService.calculateRetryFees(transaction)
+    const retryFees = await relayerWalletService.calculateRetryFees(transaction)
 
     const { value, data, gasLimit, to } = transaction.params
 
@@ -24,10 +22,15 @@ class RetryTransactionService {
       to,
       data,
       gasLimit,
-      maxFeePerGas,
       nonce: operation.nonce,
-      maxPriorityFeePerGas,
       value: ethers.parseUnits(value).toString()
+    }
+
+    if (stageConfig.NON_EIP_1559 === 'true') {
+      params.gasPrice = retryFees.gasPrice
+    } else {
+      params.maxFeePerGas = retryFees.maxFeePerGas
+      params.maxPriorityFeePerGas = retryFees.maxPriorityFeePerGas
     }
 
     const newTx = await relayerWalletService.sendRetryTransaction(params)

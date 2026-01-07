@@ -62,14 +62,21 @@ class RelayerWalletService {
     data,
     value
   }) {
-    const { maxFeePerGas, maxPriorityFeePerGas } = await this.getFeeData()
+    const feeData = await this.getFeeData()
+    
     const transaction = {
       to,
       data,
-      value,
-      maxFeePerGas,
-      maxPriorityFeePerGas
+      value
     }
+    
+    if (stageConfig.NON_EIP_1559 === 'true') {
+      transaction.gasPrice = feeData.gasPrice
+    } else {
+      transaction.maxFeePerGas = feeData.maxFeePerGas
+      transaction.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas
+    }
+    
     return await this.relayerWallet.sendTransaction(transaction)
   }
 
@@ -80,17 +87,24 @@ class RelayerWalletService {
     value,
     gasLimit,
     maxFeePerGas,
-    maxPriorityFeePerGas
+    maxPriorityFeePerGas,
+    gasPrice
   }) {
     const transaction = {
       to,
       data,
       nonce,
       value,
-      gasLimit,
-      maxFeePerGas,
-      maxPriorityFeePerGas
+      gasLimit
     }
+    
+    if (stageConfig.NON_EIP_1559 === 'true') {
+      transaction.gasPrice = gasPrice
+    } else {
+      transaction.maxFeePerGas = maxFeePerGas
+      transaction.maxPriorityFeePerGas = maxPriorityFeePerGas
+    }
+    
     return await this.relayerWallet.sendTransaction(transaction)
   }
 
@@ -130,6 +144,10 @@ class RelayerWalletService {
       return this.fetchGasPrice()
     }
 
+    if (stageConfig.NON_EIP_1559 === 'true') {
+      return this.fetchLegacyGasPrice()
+    }
+
     const feeData = await this.provider.getFeeData()
     const {
       maxFeePerGas,
@@ -151,23 +169,34 @@ class RelayerWalletService {
     }
   }
 
+  getDefaultLegacyGasPrice () {
+    const gasPrice = ethers.parseUnits(stageConfig.DEFAULT_GAS_PRICE, 'gwei')
+    return {
+      gasPrice
+    }
+  }
+
+  async _fetchRpcGasPrice () {
+    const url = stageConfig.JSON_RPC_URL
+    const options = {
+      method: 'POST',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'eth_gasPrice' })
+    }
+
+    const res = await fetch(`${url}`, options)
+    const data = await res.json()
+    if (!data || !data.result) {
+      const message = data?.error?.message || 'No error message provided by RPC provider'
+      throw new BadRequestError(`Invalid response from RPC provider: ${message}`, 'INVALID_RESPONSE_FROM_RPC_PROVIDER')
+    }
+
+    return data.result
+  }
+
   async fetchGasPrice () {
     try {
-      const url = stageConfig.JSON_RPC_URL
-      const options = {
-        method: 'POST',
-        headers: { accept: 'application/json', 'content-type': 'application/json' },
-        body: JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'eth_gasPrice' })
-      }
-
-      const res = await fetch(`${url}`, options)
-      const data = await res.json()
-      if (!data || !data.result) {
-        const message = data?.error?.message || 'No error message provided by RPC provider'
-        throw new BadRequestError(`Invalid response from RPC provider: ${message}`, 'INVALID_RESPONSE_FROM_RPC_PROVIDER')
-      }
-
-      const gasPrice = data.result
+      const gasPrice = await this._fetchRpcGasPrice()
       const maxFeePerGas = BigInt(gasPrice) + BigInt(
         ethers.parseUnits(
           stageConfig.GWEI_ADDED_TO_MEDIAN_GAS_PRICE, 'gwei').toString())
@@ -183,8 +212,23 @@ class RelayerWalletService {
     }
   }
 
-  async getFeeData () {
-    const feeData = await this.fetchFeeData()
+  async fetchLegacyGasPrice () {
+    try {
+      const gasPrice = await this._fetchRpcGasPrice()
+      const gasPriceBigInt = BigInt(gasPrice) + BigInt(
+        ethers.parseUnits(
+          stageConfig.GWEI_ADDED_TO_MEDIAN_GAS_PRICE, 'gwei').toString())
+
+      return {
+        gasPrice: gasPriceBigInt
+      }
+    } catch (err) {
+      logger.error(`Catch an error while fetching gas price from RPC provider. Default fee data will be used. Reason: ${err.message}`)
+      return this.getDefaultLegacyGasPrice()
+    }
+  }
+
+  _processEIP1559FeeData (feeData) {
     let {
       maxFeePerGas,
       maxPriorityFeePerGas
@@ -202,11 +246,32 @@ class RelayerWalletService {
     }
   }
 
+  _processLegacyFeeData (feeData) {
+    const { gasPrice } = feeData
+    const maximumGasFee = BN.min(
+      new BN(gasPrice.toString()),
+      new BN(ethers.parseUnits(stageConfig.MAX_GAS_PRICE, 'gwei').toString())
+    )
+    return {
+      gasPrice: BigInt(maximumGasFee.toString())
+    }
+  }
+
+  async getFeeData () {
+    const feeData = await this.fetchFeeData()
+    
+    if (stageConfig.NON_EIP_1559 === 'true') {
+      return this._processLegacyFeeData(feeData)
+    }
+    
+    return this._processEIP1559FeeData(feeData)
+  }
+
   async getTransactionReceipt (txHash) {
     return await this.provider.getTransactionReceipt(txHash)
   }
 
-  async calculateRetryFees (transaction) {
+  async _calculateEIP1559RetryFees (transaction) {
     let {
       maxFeePerGas,
       maxPriorityFeePerGas
@@ -230,6 +295,29 @@ class RelayerWalletService {
       maxFeePerGas,
       maxPriorityFeePerGas
     }
+  }
+
+  async _calculateLegacyRetryFees (transaction) {
+    let { gasPrice } = await this.getFeeData()
+
+    const txGasPrice = BigInt(transaction.params.gasPrice.toString())
+
+    if (txGasPrice >= gasPrice) {
+      gasPrice = txGasPrice + BigInt(ethers.parseUnits(stageConfig.GWEI_ADDED_ON_RETRY, 'gwei'))
+      logger.debug(`__feePerGasOption__ : ${stageConfig.GWEI_ADDED_ON_RETRY} GWEI was added to gasPrice: ${gasPrice}`)
+    }
+
+    return {
+      gasPrice
+    }
+  }
+
+  async calculateRetryFees (transaction) {
+    if (stageConfig.NON_EIP_1559 === 'true') {
+      return this._calculateLegacyRetryFees(transaction)
+    }
+    
+    return this._calculateEIP1559RetryFees(transaction)
   }
 
   async waitNBlocks (n) {

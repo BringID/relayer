@@ -31,13 +31,16 @@ const TransactionSchema = new mongoose.Schema(
         type: String,
         required: true
       },
+      // EIP-1559 fields (for EIP-1559 networks)
       maxPriorityFeePerGas: {
-        type: String,
-        required: true
+        type: String
       },
       maxFeePerGas: {
-        type: String,
-        required: true
+        type: String
+      },
+      // Legacy field (for non-EIP-1559 networks)
+      gasPrice: {
+        type: String
       },
       data: {
         type: String

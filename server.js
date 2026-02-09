@@ -52,7 +52,7 @@ app.use(asyncHandler(requestValidator))
 
 // Define routes
 app.use('/api/v1/', buildRouter('routes'))
-app.get('/', (req, res) => res.send('👋 Hello from ZkBring Relayer Server'))
+app.get('/', (req, res) => res.send('👋 Hello from BringID Relayer Server'))
 
 // Error handling middleware
 app.use((error, req, res, next) => {

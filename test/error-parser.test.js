@@ -63,6 +63,43 @@ describe('ErrorParser', () => {
           errorParser.parseContractError(err, 'airdrop')
         }).to.throw(BadRequestError, 'Error simulating transaction call')
       })
+
+      it('should parse BID revert reason from err.reason', () => {
+        const err = {
+          reason: 'execution reverted: BID::already registered',
+          message: 'execution reverted'
+        }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError)
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error).to.be.instanceOf(BadRequestError)
+          expect(error.cause).to.equal('ALREADY_REGISTERED')
+          expect(error.message).to.equal('Credential already registered')
+        }
+      })
+
+      it('should parse BID revert reason from err.message', () => {
+        const err = {
+          message: 'call exception (execution reverted: BID::attestation expired)'
+        }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError)
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error).to.be.instanceOf(BadRequestError)
+          expect(error.cause).to.equal('ATTESTATION_EXPIRED')
+          expect(error.message).to.equal('Attestation expired')
+        }
+      })
     })
 
     describe('when error data exists and can be parsed', () => {
@@ -266,6 +303,25 @@ describe('ErrorParser', () => {
         expect(() => {
           errorParser.parseContractError(err, 'airdrop')
         }).to.throw(BadRequestError, 'Error simulating transaction call')
+      })
+
+      it('should parse BID revert reason even when error data exists but ABI parsing fails', () => {
+        const err = {
+          data: '0x12345678' + '0'.repeat(64),
+          reason: 'execution reverted: BID::recovery pending'
+        }
+
+        expect(() => {
+          errorParser.parseContractError(err, 'airdrop')
+        }).to.throw(BadRequestError)
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error).to.be.instanceOf(BadRequestError)
+          expect(error.cause).to.equal('RECOVERY_PENDING')
+          expect(error.message).to.equal('Recovery is pending')
+        }
       })
     })
 

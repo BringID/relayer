@@ -25,5 +25,7 @@
   "LEAF_GREATER_THAN_SNARK_SCALAR_FIELD": { "warn": true },
   "CALLER_IS_NOT_THE_PENDING_GROUP_ADMIN": { "warn": true },
   "MERKLE_TREE_ROOT_IS_NOT_PART_OF_THE_GROUP": { "warn": true },
+  "ALREADY_REGISTERED": { "warn": true },
+  "ATTESTATION_EXPIRED": { "warn": true },
   "API_SECRET_KEY_NOT_PROVIDED": { "silence": true }
 }

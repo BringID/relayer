@@ -89,6 +89,50 @@ const ERROR_MAPPING = {
   }
 }
 
+// Mapping BID:: revert reasons to application error codes and messages
+const BID_REVERT_MAPPING = {
+  'BID::already registered': {
+    code: 'ALREADY_REGISTERED',
+    message: () => 'Credential already registered'
+  },
+  'BID::not registered': {
+    code: 'NOT_REGISTERED',
+    message: () => 'Credential is not registered'
+  },
+  'BID::app not active': {
+    code: 'APP_NOT_ACTIVE',
+    message: () => 'App is not active'
+  },
+  'BID::attestation expired': {
+    code: 'ATTESTATION_EXPIRED',
+    message: () => 'Attestation expired'
+  },
+  'BID::invalid attestation': {
+    code: 'INVALID_ATTESTATION',
+    message: () => 'Invalid attestation'
+  },
+  'BID::credential group not active': {
+    code: 'CREDENTIAL_GROUP_NOT_ACTIVE',
+    message: () => 'Credential group is not active'
+  },
+  'BID::recovery pending': {
+    code: 'RECOVERY_PENDING',
+    message: () => 'Recovery is pending'
+  },
+  'BID::not expired': {
+    code: 'NOT_EXPIRED',
+    message: () => 'Credential is not expired'
+  },
+  'BID::family mismatch': {
+    code: 'FAMILY_MISMATCH',
+    message: () => 'Credential family mismatch'
+  },
+  'BID::group mismatch': {
+    code: 'GROUP_MISMATCH',
+    message: () => 'Credential group mismatch'
+  }
+}
+
 class ErrorParser {
   constructor () {
     // Load ABI once during initialization
@@ -112,12 +156,48 @@ class ErrorParser {
     }
   }
 
+  _extractErrorTexts (err) {
+    return [
+      err?.reason,
+      err?.revert?.reason,
+      err?.error?.reason,
+      err?.message,
+      err?.error?.message
+    ].filter(Boolean)
+  }
+
+  _tryParseBidRevertReason (err) {
+    const errorTexts = this._extractErrorTexts(err)
+
+    for (const errorText of errorTexts) {
+      const matchedReason = Object.keys(BID_REVERT_MAPPING).find(reason => errorText.includes(reason))
+
+      if (!matchedReason) {
+        continue
+      }
+
+      const errorMapping = BID_REVERT_MAPPING[matchedReason]
+      const parsedMessage = typeof errorMapping.message === 'function'
+        ? errorMapping.message()
+        : errorMapping.message
+
+      logger.warn(`Parsed BID revert reason: ${matchedReason}`, {
+        matchedReason,
+        code: errorMapping.code
+      })
+
+      throw new BadRequestError(parsedMessage, errorMapping.code)
+    }
+  }
+
   parseContractError (err, contractName = 'airdrop') {
     // Extract error data - check multiple possible locations
     const errorData = err?.data ?? err?.error?.data ?? err?.revert?.data
     
     if (!errorData) {
-      // No error data available, throw generic error
+      this._tryParseBidRevertReason(err)
+
+      // No parseable error data available, throw generic error
       const reason = err?.reason || 'Unknown reason'
       const message = err?.message || 'Unknown message'
       logger.warn(`Error simulating transaction: Reason: ${reason}, Message: ${message}`)
@@ -183,6 +263,8 @@ class ErrorParser {
         continue
       }
     }
+
+    this._tryParseBidRevertReason(err)
     
     // If we get here, none of the interfaces could parse the error
     try {

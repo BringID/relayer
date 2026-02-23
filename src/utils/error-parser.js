@@ -3,9 +3,54 @@ const logger = require('./logger')
 const { BadRequestError } = require('./errors')
 const airdropErrorsABI = require('../../contracts/airdrop-errors.json')
 const semaphoreErrorsABI = require('../../contracts/semaphore-errors.json')
+const registryErrorsABI = require('../../contracts/registry-errors.json')
 
 // Mapping contract error names to application error codes and messages
 const ERROR_MAPPING = {
+  // Registry (CredentialRegistry) custom errors – all 41
+  AlreadyExpired: { code: 'ALREADY_EXPIRED', message: () => 'Credential already expired' },
+  AlreadyRegistered: { code: 'ALREADY_REGISTERED', message: () => 'Credential already registered' },
+  AppIdMismatch: { code: 'APP_ID_MISMATCH', message: () => 'App ID mismatch' },
+  AppNotActive: { code: 'APP_NOT_ACTIVE', message: () => 'App is not active' },
+  AppNotSuspended: { code: 'APP_NOT_SUSPENDED', message: () => 'App is not suspended' },
+  AttestationExpired: { code: 'ATTESTATION_EXPIRED', message: () => 'Attestation expired' },
+  CommitmentMismatch: { code: 'COMMITMENT_MISMATCH', message: () => 'Commitment mismatch' },
+  CredentialGroupExists: { code: 'CREDENTIAL_GROUP_EXISTS', message: () => 'Credential group already exists' },
+  CredentialGroupInactive: { code: 'CREDENTIAL_GROUP_INACTIVE', message: () => 'Credential group is not active' },
+  CredentialGroupNotActive: { code: 'CREDENTIAL_GROUP_NOT_ACTIVE', message: () => 'Credential group is not active' },
+  CredentialGroupNotFound: { code: 'CREDENTIAL_GROUP_NOT_FOUND', message: () => 'Credential group not found' },
+  CredentialGroupNotSuspended: { code: 'CREDENTIAL_GROUP_NOT_SUSPENDED', message: () => 'Credential group is not suspended' },
+  DuplicateCredentialGroup: { code: 'DUPLICATE_CREDENTIAL_GROUP', message: () => 'Duplicate credential group' },
+  FutureAttestation: { code: 'FUTURE_ATTESTATION', message: () => 'Attestation is dated in the future' },
+  GroupMismatch: { code: 'GROUP_MISMATCH', message: () => 'Credential group mismatch' },
+  InvalidAdminAddress: { code: 'INVALID_ADMIN_ADDRESS', message: () => 'Invalid admin address' },
+  InvalidAttestationSigLength: { code: 'INVALID_ATTESTATION_SIG_LENGTH', message: () => 'Invalid attestation signature length' },
+  InvalidCommitment: { code: 'INVALID_COMMITMENT', message: () => 'Invalid commitment' },
+  InvalidProof: { code: 'INVALID_PROOF', message: () => 'Invalid proof' },
+  InvalidScorerAddress: { code: 'INVALID_SCORER_ADDRESS', message: () => 'Invalid scorer address' },
+  InvalidScorerContract: { code: 'INVALID_SCORER_CONTRACT', message: () => 'Invalid scorer contract' },
+  InvalidTrustedVerifier: { code: 'INVALID_TRUSTED_VERIFIER', message: () => 'Invalid trusted verifier' },
+  InvalidVerifierAddress: { code: 'INVALID_VERIFIER_ADDRESS', message: () => 'Invalid verifier address' },
+  NoExpirySet: { code: 'NO_EXPIRY_SET', message: () => 'No expiry set' },
+  NoPendingRecovery: { code: 'NO_PENDING_RECOVERY', message: () => 'No pending recovery' },
+  NoSemaphoreGroup: { code: 'NO_SEMAPHORE_GROUP', message: () => 'No Semaphore group' },
+  NotAppAdmin: { code: 'NOT_APP_ADMIN', message: () => 'Caller is not the app admin' },
+  NotPendingAdmin: { code: 'NOT_PENDING_ADMIN', message: () => 'Caller is not the pending admin' },
+  NotRegistered: { code: 'NOT_REGISTERED', message: () => 'Credential is not registered' },
+  NotYetExpired: { code: 'NOT_YET_EXPIRED', message: () => 'Credential is not yet expired' },
+  RecoveryAlreadyPending: { code: 'RECOVERY_ALREADY_PENDING', message: () => 'Recovery already pending' },
+  RecoveryDisabled: { code: 'RECOVERY_DISABLED', message: () => 'Recovery is disabled' },
+  RecoveryPending: { code: 'RECOVERY_PENDING', message: () => 'Recovery is pending' },
+  RecoveryTimelockNotExpired: { code: 'RECOVERY_TIMELOCK_NOT_EXPIRED', message: () => 'Recovery timelock has not expired' },
+  ScopeMismatch: { code: 'SCOPE_MISMATCH', message: () => 'Scope mismatch' },
+  UntrustedVerifier: { code: 'UNTRUSTED_VERIFIER', message: () => 'Verifier is not trusted' },
+  VerifierNotTrusted: { code: 'VERIFIER_NOT_TRUSTED', message: () => 'Verifier is not trusted' },
+  WrongChain: { code: 'WRONG_CHAIN', message: () => 'Wrong chain' },
+  WrongRegistryAddress: { code: 'WRONG_REGISTRY_ADDRESS', message: () => 'Wrong registry address' },
+  ZeroCredentialGroupId: { code: 'ZERO_CREDENTIAL_GROUP_ID', message: () => 'Credential group ID is zero' },
+  ZeroDuration: { code: 'ZERO_DURATION', message: () => 'Duration is zero' },
+  ZeroMerkleTreeDuration: { code: 'ZERO_MERKLE_TREE_DURATION', message: () => 'Merkle tree duration is zero' },
+  // Airdrop errors
   AirdropClaimed: {
     code: 'AIRDROP_ALREADY_CLAIMED',
     message: (args) => `Airdrop already claimed for address: ${args[0]}`
@@ -89,50 +134,6 @@ const ERROR_MAPPING = {
   }
 }
 
-// Mapping BID:: revert reasons to application error codes and messages
-const BID_REVERT_MAPPING = {
-  'BID::already registered': {
-    code: 'ALREADY_REGISTERED',
-    message: () => 'Credential already registered'
-  },
-  'BID::not registered': {
-    code: 'NOT_REGISTERED',
-    message: () => 'Credential is not registered'
-  },
-  'BID::app not active': {
-    code: 'APP_NOT_ACTIVE',
-    message: () => 'App is not active'
-  },
-  'BID::attestation expired': {
-    code: 'ATTESTATION_EXPIRED',
-    message: () => 'Attestation expired'
-  },
-  'BID::invalid attestation': {
-    code: 'INVALID_ATTESTATION',
-    message: () => 'Invalid attestation'
-  },
-  'BID::credential group not active': {
-    code: 'CREDENTIAL_GROUP_NOT_ACTIVE',
-    message: () => 'Credential group is not active'
-  },
-  'BID::recovery pending': {
-    code: 'RECOVERY_PENDING',
-    message: () => 'Recovery is pending'
-  },
-  'BID::not expired': {
-    code: 'NOT_EXPIRED',
-    message: () => 'Credential is not expired'
-  },
-  'BID::family mismatch': {
-    code: 'FAMILY_MISMATCH',
-    message: () => 'Credential family mismatch'
-  },
-  'BID::group mismatch': {
-    code: 'GROUP_MISMATCH',
-    message: () => 'Credential group mismatch'
-  }
-}
-
 class ErrorParser {
   constructor () {
     // Load ABI once during initialization
@@ -142,12 +143,19 @@ class ErrorParser {
 
   _loadABIs () {
     try {
+      this.interfaces.registry = new Interface(registryErrorsABI)
+      logger.info('Loaded ABI for contract: registry')
+    } catch (err) {
+      logger.error(`Failed to load ABI: ${err.message}`)
+    }
+
+    try {
       this.interfaces.airdrop = new Interface(airdropErrorsABI)
       logger.info('Loaded ABI for contract: airdrop')
     } catch (err) {
       logger.error(`Failed to load ABI: ${err.message}`)
     }
-    
+
     try {
       this.interfaces.semaphore = new Interface(semaphoreErrorsABI)
       logger.info('Loaded ABI for contract: semaphore')
@@ -156,47 +164,11 @@ class ErrorParser {
     }
   }
 
-  _extractErrorTexts (err) {
-    return [
-      err?.reason,
-      err?.revert?.reason,
-      err?.error?.reason,
-      err?.message,
-      err?.error?.message
-    ].filter(Boolean)
-  }
-
-  _tryParseBidRevertReason (err) {
-    const errorTexts = this._extractErrorTexts(err)
-
-    for (const errorText of errorTexts) {
-      const matchedReason = Object.keys(BID_REVERT_MAPPING).find(reason => errorText.includes(reason))
-
-      if (!matchedReason) {
-        continue
-      }
-
-      const errorMapping = BID_REVERT_MAPPING[matchedReason]
-      const parsedMessage = typeof errorMapping.message === 'function'
-        ? errorMapping.message()
-        : errorMapping.message
-
-      logger.warn(`Parsed BID revert reason: ${matchedReason}`, {
-        matchedReason,
-        code: errorMapping.code
-      })
-
-      throw new BadRequestError(parsedMessage, errorMapping.code)
-    }
-  }
-
   parseContractError (err, contractName = 'airdrop') {
     // Extract error data - check multiple possible locations
     const errorData = err?.data ?? err?.error?.data ?? err?.revert?.data
-    
-    if (!errorData) {
-      this._tryParseBidRevertReason(err)
 
+    if (!errorData) {
       // No parseable error data available, throw generic error
       const reason = err?.reason || 'Unknown reason'
       const message = err?.message || 'Unknown message'
@@ -204,12 +176,8 @@ class ErrorParser {
       throw new BadRequestError('Error simulating transaction call', 'SIMULATION_CALL_FAILED')
     }
 
-    // Try to parse error through all available interfaces
-    // Since airdrop inherits from Semaphore, errors can come from either contract
-    const interfacesToTry = contractName === 'airdrop' 
-      ? ['airdrop', 'semaphore'] 
-      : [contractName]
-    
+    // Try each interface in order; first successful parse wins
+    const interfacesToTry = ['registry', 'airdrop', 'semaphore']
     let lastParseError = null
     
     for (const interfaceName of interfacesToTry) {
@@ -264,8 +232,6 @@ class ErrorParser {
       }
     }
 
-    this._tryParseBidRevertReason(err)
-    
     // If we get here, none of the interfaces could parse the error
     try {
       // Check if we have a specific interface for the contract name

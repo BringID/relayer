@@ -6,17 +6,19 @@ const sinon = require('sinon')
 const { BadRequestError } = require('../src/utils/errors')
 const airdropErrorsABI = require('../contracts/airdrop-errors.json')
 const semaphoreErrorsABI = require('../contracts/semaphore-errors.json')
+const registryErrorsABI = require('../contracts/registry-errors.json')
 
 describe('ErrorParser', () => {
   let errorParser
   let loggerStub
   let airdropIface
   let semaphoreIface
+  let registryIface
 
   before(() => {
-    // Create Interfaces for generating error data
     airdropIface = new Interface(airdropErrorsABI)
     semaphoreIface = new Interface(semaphoreErrorsABI)
+    registryIface = new Interface(registryErrorsABI)
   })
 
   beforeEach(() => {
@@ -63,12 +65,12 @@ describe('ErrorParser', () => {
           errorParser.parseContractError(err, 'airdrop')
         }).to.throw(BadRequestError, 'Error simulating transaction call')
       })
+    })
 
-      it('should parse BID revert reason from err.reason', () => {
-        const err = {
-          reason: 'execution reverted: BID::already registered',
-          message: 'execution reverted'
-        }
+    describe('registry custom errors', () => {
+      it('should parse AlreadyRegistered error from registry (err.data)', () => {
+        const errorData = registryIface.encodeErrorResult('AlreadyRegistered', [])
+        const err = { data: errorData }
 
         expect(() => {
           errorParser.parseContractError(err, 'airdrop')
@@ -83,10 +85,9 @@ describe('ErrorParser', () => {
         }
       })
 
-      it('should parse BID revert reason from err.message', () => {
-        const err = {
-          message: 'call exception (execution reverted: BID::attestation expired)'
-        }
+      it('should parse AttestationExpired error from registry', () => {
+        const errorData = registryIface.encodeErrorResult('AttestationExpired', [])
+        const err = { data: errorData }
 
         expect(() => {
           errorParser.parseContractError(err, 'airdrop')
@@ -95,9 +96,56 @@ describe('ErrorParser', () => {
         try {
           errorParser.parseContractError(err, 'airdrop')
         } catch (error) {
-          expect(error).to.be.instanceOf(BadRequestError)
           expect(error.cause).to.equal('ATTESTATION_EXPIRED')
           expect(error.message).to.equal('Attestation expired')
+        }
+      })
+
+      it('should parse WrongChain error from registry', () => {
+        const errorData = registryIface.encodeErrorResult('WrongChain', [])
+        const err = { data: errorData }
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error.cause).to.equal('WRONG_CHAIN')
+          expect(error.message).to.equal('Wrong chain')
+        }
+      })
+
+      it('should parse InvalidCommitment error from registry', () => {
+        const errorData = registryIface.encodeErrorResult('InvalidCommitment', [])
+        const err = { data: errorData }
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error.cause).to.equal('INVALID_COMMITMENT')
+          expect(error.message).to.equal('Invalid commitment')
+        }
+      })
+
+      it('should parse ScopeMismatch error from registry', () => {
+        const errorData = registryIface.encodeErrorResult('ScopeMismatch', [])
+        const err = { data: errorData }
+
+        try {
+          errorParser.parseContractError(err, 'airdrop')
+        } catch (error) {
+          expect(error.cause).to.equal('SCOPE_MISMATCH')
+          expect(error.message).to.equal('Scope mismatch')
+        }
+      })
+
+      it('should parse RecoveryPending error when contractName is registry', () => {
+        const errorData = registryIface.encodeErrorResult('RecoveryPending', [])
+        const err = { data: errorData }
+
+        try {
+          errorParser.parseContractError(err, 'registry')
+        } catch (error) {
+          expect(error.cause).to.equal('RECOVERY_PENDING')
+          expect(error.message).to.equal('Recovery is pending')
         }
       })
     })
@@ -305,38 +353,33 @@ describe('ErrorParser', () => {
         }).to.throw(BadRequestError, 'Error simulating transaction call')
       })
 
-      it('should parse BID revert reason even when error data exists but ABI parsing fails', () => {
+      it('should throw SIMULATION_CALL_FAILED when error data exists but no interface can parse it', () => {
         const err = {
           data: '0x12345678' + '0'.repeat(64),
-          reason: 'execution reverted: BID::recovery pending'
+          reason: 'execution reverted'
         }
 
         expect(() => {
           errorParser.parseContractError(err, 'airdrop')
-        }).to.throw(BadRequestError)
+        }).to.throw(BadRequestError, 'Error simulating transaction call')
 
-        try {
-          errorParser.parseContractError(err, 'airdrop')
-        } catch (error) {
-          expect(error).to.be.instanceOf(BadRequestError)
-          expect(error.cause).to.equal('RECOVERY_PENDING')
-          expect(error.message).to.equal('Recovery is pending')
-        }
+        expect(loggerStub.warn.called).to.be.true
       })
     })
 
-    describe('when contract interface is not found', () => {
-      it('should throw SIMULATION_CALL_FAILED for unknown contract', () => {
+    describe('contractName is ignored (always try all interfaces)', () => {
+      it('should parse valid error data even when contractName is unknown', () => {
         const testAddress = '0x1234567890123456789012345678901234567890'
         const errorData = airdropIface.encodeErrorResult('AirdropClaimed', [testAddress])
         const err = { data: errorData }
 
-        expect(() => {
+        try {
           errorParser.parseContractError(err, 'unknown-contract')
-        }).to.throw(BadRequestError, 'Error simulating transaction call')
-
-        expect(loggerStub.warn.called).to.be.true
-        expect(loggerStub.warn.firstCall.args[0]).to.include('Interface not found')
+        } catch (error) {
+          expect(error).to.be.instanceOf(BadRequestError)
+          expect(error.cause).to.equal('AIRDROP_ALREADY_CLAIMED')
+          expect(error.message).to.include(testAddress)
+        }
       })
     })
 

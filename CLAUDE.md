@@ -2,17 +2,18 @@
 
 ## Project Overview
 
-**BringID Relayer** is a Node.js server application designed to execute blockchain operations through a relayer wallet. The server receives operation requests, sends transactions to the blockchain, tracks their status, and automatically retries failed transactions with increased gas fees.
+**BringID Relayer** (`bringid-relayer`, version 3.0.0) is a Node.js server application that executes blockchain operations through a relayer wallet. It accepts operation requests, sends transactions to the blockchain, tracks their status, and processes pending operations via background workers.
 
 ### Purpose
 
-The server manages blockchain operations by:
-- Accepting operation execution requests
-- Sending transactions to the blockchain via a relayer wallet
-- Tracking transaction status and monitoring for completion
-- Automatically retrying failed transactions with increased gas fees
-- Managing nonce queue to prevent conflicts in parallel transactions
-- Simulating transactions for "claim" type operations before sending
+The server:
+- Accepts operation execution requests (POST `/api/v1/operations/execute`)
+- Sends transactions via a relayer wallet (Ethers.js, EIP-1559 fee model)
+- Tracks transaction status and monitors for completion
+- Runs a pending-operations worker to update status from chain and re-track pending ops
+- Manages a nonce queue to avoid conflicts in parallel transactions
+- Reinitializes the nonce queue on a cron schedule
+- Simulates "claim" operations before sending to surface contract errors early
 
 ### Technology Stack
 
@@ -21,10 +22,11 @@ The server manages blockchain operations by:
 - **Framework**: Express.js
 - **Database**: MongoDB (Mongoose ODM)
 - **Blockchain**: Ethers.js v6
-- **Validation**: Celebrate (Joi) - optional
+- **Validation**: Request auth via `api-secret-key` header (optional via `REQUEST_VALIDATION`). Celebrate (Joi) is present but route-level celebrate schemas are commented out for the current API.
 - **Logging**: Winston
 - **Monitoring**: Datadog (dd-trace)
-- **Task Scheduling**: node-cron
+- **Task scheduling**: node-cron
+- **Tests**: Mocha, Chai, Sinon, proxyquire
 
 ### Architecture
 
@@ -57,18 +59,46 @@ The application follows a layered architecture:
 
 ### Key Components
 
-1. **Routes** (`src/routes/routes.js`): Defines API endpoints
-2. **Controllers** (`src/controllers/relayer-controller.js`): Handles HTTP requests/responses
+1. **Routes**: `src/routes/index.js` builds the API router; `src/routes/routes.js` defines endpoints and controller methods. Mounted at `/api/v1/` via `buildRouter('routes')`.
+2. **Controllers** (`src/controllers/relayer-controller.js`): `executeOperation`, `getOperationStatus`.
 3. **Services**:
-   - `relayer-service.js`: Main operation execution logic
-   - `operation-service.js`: CRUD operations for operations
-   - `relayer-wallet-service.js`: Wallet and transaction management
-   - `transaction-tracker-service.js`: Transaction status tracking
-   - `retry-transaction-service.js`: Retry failed transactions
-   - `nonce-queue-service.js`: Nonce queue management
-   - `latest-nonce-service.js`: Get latest nonce from blockchain and database
-4. **Workers** (`tasks/`): Background jobs for processing pending operations and reinitializing nonce queue
-5. **Models**: MongoDB schemas for Operation and Transaction entities
+   - `relayer-service.js`: Execute operation, dedupe by existing operation, simulate claim, send tx, track
+   - `operation-service.js`: CRUD and find pending operations
+   - `relayer-wallet-service.js`: Wallet (AutoNonceWallet), send tx, fee data (EIP-1559; OP Stack uses `eth_gasPrice` + `GWEI_ADDED_TO_MEDIAN_GAS_PRICE`), simulate call, retry fee calculation
+   - `transaction-tracker-service.js`: Track pending operations (wait N blocks, check receipt, update status; retry with higher gas via retry-transaction-service)
+   - `retry-transaction-service.js`: Retry failed/dropped transactions with increased gas
+   - `nonce-queue-service.js`: Nonce queue and `reInitNextNonce()`
+   - `latest-nonce-service.js`: Latest nonce from chain and DB
+4. **Workers** (`tasks/`): `pending-operation-retry-scheduler.js` (cron → pending-operations-worker), `nonce-queue-reinit-scheduler.js` (cron → nonce queue reinit). Both run only when `NODE_ENV=production`.
+5. **Models**: `src/models/operation.js` (Operation with embedded Transaction schema), `src/models/transaction.js` (TransactionSchema), `src/models/connectDB.js`.
+6. **Contract errors**: `src/utils/error-parser.js` parses revert data using ABIs from `contracts/airdrop-errors.json`, `contracts/semaphore-errors.json`, `contracts/registry-errors.json` (CredentialRegistry). Tries interfaces in order: registry, airdrop, semaphore.
+7. **Config**: `stage-config.js` loads from `configs/${NODE_ENV}.env` (dotenv). Error logging behavior: `configs/error-to-warn.json`. MongoDB migrations: `src/migrate-mongo-config.js` (migrations dir: `migrations`).
+
+### Project Structure (main files)
+
+```
+server.js
+stage-config.js
+src/
+  routes/index.js, routes/routes.js
+  controllers/relayer-controller.js
+  services/relayer-service.js, operation-service.js, relayer-wallet-service.js,
+    transaction-tracker-service.js, retry-transaction-service.js,
+    nonce-queue-service.js, latest-nonce-service.js
+  models/operation.js, transaction.js, connectDB.js
+  utils/logger.js, errors.js, request-validator.js, error-parser.js, celebrate-builder.js
+  migrate-mongo-config.js
+tasks/
+  pending-operation-retry-scheduler.js, pending-operations-worker.js
+  nonce-queue-reinit-scheduler.js
+configs/
+  error-to-warn.json
+  development.env, production.env, test.env  (per NODE_ENV; typically not in repo)
+contracts/
+  airdrop-errors.json, semaphore-errors.json, registry-errors.json
+test/
+  operation-service.test.js, error-parser.test.js
+```
 
 ### Request Authentication
 
@@ -166,27 +196,15 @@ interface IContractErrorResponse {
 
 **Common Contract Error Codes:**
 
-- `AIRDROP_ALREADY_CLAIMED` - Airdrop already claimed for address
-- `AIRDROP_STOPPED` - Airdrop is currently stopped
-- `AMOUNT_IS_ZERO` - Amount is zero
-- `INSUFFICIENT_SCORE` - Insufficient score. Required threshold not met
-- `THRESHOLD_IS_ZERO` - Threshold is zero
-- `TRANSFER_FAILED` - Token transfer failed
-- `SIMULATION_CALL_FAILED` - Simulation call failed while executing operation
-- `INVALID_PROOF` - Invalid Semaphore proof
-- `MERKLE_TREE_DEPTH_IS_NOT_SUPPORTED` - Merkle tree depth is not supported
-- `MERKLE_TREE_ROOT_IS_EXPIRED` - Merkle tree root is expired
-- `MERKLE_TREE_ROOT_IS_NOT_PART_OF_THE_GROUP` - Merkle tree root is not part of the group
-- `SAME_NULLIFIERS_USED_TWICE` - The same nullifier is being used twice
-- `WRONG_SIBLING_NODES` - Wrong sibling nodes in Merkle proof
-- `LEAF_ALREADY_EXISTS` - Leaf already exists in the Merkle tree
-- `LEAF_CANNOT_BE_ZERO` - Leaf cannot be zero
-- `LEAF_DOES_NOT_EXIST` - Leaf does not exist in the Merkle tree
-- `LEAF_GREATER_THAN_SNARK_SCALAR_FIELD` - Leaf value is greater than SNARK scalar field
-- `CALLER_IS_NOT_THE_GROUP_ADMIN` - Caller is not the group admin
-- `CALLER_IS_NOT_THE_PENDING_GROUP_ADMIN` - Caller is not the pending group admin
-- `GROUP_DOES_NOT_EXIST` - Group does not exist
-- `GROUP_HAS_NO_MEMBERS` - Group has no members
+Errors are parsed by `src/utils/error-parser.js` using ABIs from `contracts/airdrop-errors.json`, `contracts/semaphore-errors.json`, and `contracts/registry-errors.json` (CredentialRegistry). Full mappings are in `ERROR_MAPPING` in error-parser.
+
+**Airdrop:** `AIRDROP_ALREADY_CLAIMED`, `AIRDROP_STOPPED`, `AMOUNT_IS_ZERO`, `INSUFFICIENT_SCORE`, `THRESHOLD_IS_ZERO`, `TRANSFER_FAILED`
+
+**Semaphore:** `INVALID_PROOF`, `MERKLE_TREE_DEPTH_IS_NOT_SUPPORTED`, `MERKLE_TREE_ROOT_IS_EXPIRED`, `MERKLE_TREE_ROOT_IS_NOT_PART_OF_THE_GROUP`, `SAME_NULLIFIERS_USED_TWICE`, `WRONG_SIBLING_NODES`, `LEAF_ALREADY_EXISTS`, `LEAF_CANNOT_BE_ZERO`, `LEAF_DOES_NOT_EXIST`, `LEAF_GREATER_THAN_SNARK_SCALAR_FIELD`, `CALLER_IS_NOT_THE_GROUP_ADMIN`, `CALLER_IS_NOT_THE_PENDING_GROUP_ADMIN`, `GROUP_DOES_NOT_EXIST`, `GROUP_HAS_NO_MEMBERS`
+
+**CredentialRegistry (registry):** Many codes including `ALREADY_EXPIRED`, `ALREADY_REGISTERED`, `APP_ID_MISMATCH`, `APP_NOT_ACTIVE`, `ATTESTATION_EXPIRED`, `COMMITMENT_MISMATCH`, `CREDENTIAL_GROUP_*`, `INVALID_*`, `NOT_REGISTERED`, `RECOVERY_*`, `WRONG_CHAIN`, etc. See `ERROR_MAPPING` in `src/utils/error-parser.js` and `contracts/registry-errors.json`.
+
+**Other:** `SIMULATION_CALL_FAILED` (when simulation fails and no parseable contract error)
 
 **Example Contract Error:**
 ```json
@@ -358,9 +376,8 @@ interface ITransaction {
     to: string                        // Required: Contract address
     value: string                     // Required: Value in wei (as string)
     gasLimit: string                  // Required: Gas limit (as string)
-    maxPriorityFeePerGas?: string     // EIP-1559: Max priority fee per gas
-    maxFeePerGas?: string             // EIP-1559: Max fee per gas
-    gasPrice?: string                 // Legacy: Gas price (for non-EIP-1559 networks)
+    maxPriorityFeePerGas: string      // Required: EIP-1559
+    maxFeePerGas: string              // Required: EIP-1559
     data?: string                     // Transaction data
     nonce?: number                    // Transaction nonce
   }
@@ -368,6 +385,7 @@ interface ITransaction {
   updatedAt: Date                    // Transaction last update timestamp
 }
 ```
+(The app uses EIP-1559 fee fields only; no legacy `gasPrice` in the schema.)
 
 **Transaction Status Flow:**
 - When a transaction is first created: `created`
@@ -415,16 +433,11 @@ interface IErrorResponse {
 
 ### Contract Error Handling
 
-Contract errors from blockchain transactions are intercepted and converted to BadRequestError with appropriate error codes. The server recognizes contract errors through ABI parsing (see `src/utils/error-parser.js`) and maps them to application error codes.
-
-**Error Mapping:**
-- Contract errors are parsed using ABI interfaces for airdrop and semaphore contracts
-- Errors are mapped to standardized error codes (see list in API Endpoints section)
-- Error messages include context when available (e.g., address for `AIRDROP_ALREADY_CLAIMED`)
+Contract reverts are parsed in `src/utils/error-parser.js` and converted to `BadRequestError` with a cause code. The parser tries three ABIs in order: **registry** (CredentialRegistry), **airdrop**, **semaphore**. First successful parse wins. Error codes and messages come from `ERROR_MAPPING`; messages can include context (e.g. address for `AIRDROP_ALREADY_CLAIMED`).
 
 ### Error Logging
 
-Some errors are logged as warnings (see `configs/error-to-warn.json`) while others are logged as errors. Silent errors are not logged at all.
+Operational errors are logged in the main error handler using `configs/error-to-warn.json`: entries keyed by error cause (e.g. `AIRDROP_ALREADY_CLAIMED`). `warn: true` → log as warning; `silence: true` → do not log; otherwise log as error.
 
 ---
 
@@ -432,56 +445,47 @@ Some errors are logged as warnings (see `configs/error-to-warn.json`) while othe
 
 ### Environment Variables
 
-Key configuration options (see `stage-config.js`):
+Configuration is loaded from `configs/${NODE_ENV}.env` via dotenv. Exported options (see `stage-config.js`):
 
-**Server Configuration:**
-- `NODE_ENV`: Environment (development, production, test)
+**Server:**
+- `NODE_ENV`: development | production | test
 - `PORT`: Server port (default: 8000)
-- `CUSTOM_PORT`: Alternative port configuration
+- `CUSTOM_PORT`: Alternative port
 
 **Database:**
-- `mongoURI`: MongoDB connection string
-- `MIGRATE_MONGO_URI`: Migration database URI
-- `MIGRATE_MONGO_DB_NAME`: Migration database name
+- `mongoURI`: MongoDB connection string (default in `connectDB.js`: `mongodb://127.0.0.1:27017/dev_bringid_relayer_db`)
+- `MIGRATE_MONGO_URI`, `MIGRATE_MONGO_DB_NAME`: Used by migrate-mongo (see `src/migrate-mongo-config.js`)
 
 **Authentication:**
-- `API_SECRET`: Secret key for API authentication
-- `REQUEST_VALIDATION`: Enable/disable request validation ("true"/"false")
+- `API_SECRET`: API secret key
+- `REQUEST_VALIDATION`: "true" to require `api-secret-key` header; otherwise validation is skipped
 
 **Blockchain:**
-- `CHAIN`: Blockchain network identifier
-- `CHAIN_ID`: Chain ID
-- `OPSTACK`: Whether using OP Stack ("true"/"false")
-- `JSON_RPC_URL`: JSON-RPC provider URL
-- `RELAYER_PRIVATE_KEY`: Private key for relayer wallet
+- `CHAIN`, `CHAIN_ID`: Network identifier
+- `OPSTACK`: "true" for OP Stack (fee data from `eth_gasPrice` + `GWEI_ADDED_TO_MEDIAN_GAS_PRICE`)
+- `JSON_RPC_URL`, `RELAYER_PRIVATE_KEY`: Required for sending transactions
 
-**Gas Configuration:**
-- `MAX_GAS_PRICE`: Maximum gas price in gwei
-- `DEFAULT_GAS_PRICE`: Default gas price in gwei
-- `DEFAULT_PIORITY_FEE_PER_GAS_PRICE`: Default priority fee per gas in gwei
-- `NON_EIP_1559`: Use legacy gas pricing ("true"/"false")
-- `GWEI_ADDED_ON_RETRY`: Gwei to add to gas price on retry
-- `GWEI_ADDED_TO_PRIORITY_FEE_ON_RETRY`: Gwei to add to priority fee on retry
-- `GWEI_ADDED_TO_MEDIAN_GAS_PRICE`: Gwei to add to median gas price from RPC
+**Gas (EIP-1559):**
+- `MAX_GAS_PRICE`: Cap in gwei
+- `DEFAULT_GAS_PRICE`, `DEFAULT_PIORITY_FEE_PER_GAS_PRICE`: Defaults when RPC fee fetch fails
+- `GWEI_ADDED_ON_RETRY`, `GWEI_ADDED_TO_PRIORITY_FEE_ON_RETRY`: Added on retry
+- When `OPSTACK=true`, `relayer-wallet-service.js` uses `GWEI_ADDED_TO_MEDIAN_GAS_PRICE` (gwei added to `eth_gasPrice`). This variable is not exported in `stage-config.js`; if using OP Stack, set it in your env and add it to `stage-config.js` so it is available.
 
-**Transaction Tracking:**
-- `TRACKER_BLOCKS_TO_WAIT`: Number of blocks to wait before checking transaction status
+**Transaction tracking:**
+- `TRACKER_BLOCKS_TO_WAIT`: Blocks to wait before checking receipt
 
-**Scheduling:**
-- `PENDING_OPERATIONS_CRON_SCHEDULE`: Cron schedule for pending operations worker
-- `REINIT_NONCE_QUEUE_CRON_SCHEDULE`: Cron schedule for nonce queue reinitialization
+**Scheduling (production only):**
+- `PENDING_OPERATIONS_CRON_SCHEDULE`: Cron for pending-operations worker
+- `REINIT_NONCE_QUEUE_CRON_SCHEDULE`: Cron for nonce queue reinit
 
 **Monitoring:**
-- `DD_VERSION`: Datadog version (from package.json version)
+- `DD_VERSION`: Set from `package.json` version
 
-**Default Database Name:**
-- If `mongoURI` is not provided, defaults to: `mongodb://127.0.0.1:27017/dev_bringid_relayer_db`
+**Scripts** (`package.json`): `npm run start` (production), `npm run dev` (development with nodemon), `npm run test` (Mocha, timeout 50s).
 
-### Error Configuration
+### Error configuration
 
-Error logging behavior is configured in `configs/error-to-warn.json`:
-- `warn: true` - Log error as warning instead of error
-- `silence: true` - Don't log error at all
+See `configs/error-to-warn.json`: keys are error cause codes; `warn: true` logs as warning, `silence: true` suppresses logging.
 
 ---
 
@@ -489,27 +493,22 @@ Error logging behavior is configured in `configs/error-to-warn.json`:
 
 ### Pending Operations Worker
 
-The `pending-operations-worker.js` processes pending operations on a cron schedule:
+`tasks/pending-operations-worker.js` is invoked on a cron schedule by `tasks/pending-operation-retry-scheduler.js` (only when `NODE_ENV=production`):
 
-1. Finds all operations with status `pending`
-2. Checks transaction receipt in blockchain for each operation
-3. Updates operation status to `completed` if transaction was successful
-4. Re-tracks operations that are still pending
-5. Updates transaction statuses accordingly
+1. Finds all operations with status `pending` via `operationService.findPendingTxs()`
+2. For each, fetches the last transaction receipt from the chain
+3. If receipt exists and `receipt.status === 1`: updates operation to `completed`, calls `operationService.updateOnTransactionMined()`
+4. Otherwise: ensures operation status is `pending` and calls `transactionTrackerService.trackPendingOperation(operation.id, true)` to re-track (which may lead to retry with higher gas via retry-transaction-service)
 
-**Scheduler:** `tasks/pending-operation-retry-scheduler.js`
-- Runs on schedule defined by `PENDING_OPERATIONS_CRON_SCHEDULE`
+**Cron:** `PENDING_OPERATIONS_CRON_SCHEDULE`
 
 ### Nonce Queue Reinit Scheduler
 
-The `nonce-queue-reinit-scheduler.js` reinitializes the nonce queue on a cron schedule:
+`tasks/nonce-queue-reinit-scheduler.js` runs on a cron (only when `NODE_ENV=production`):
 
-1. Gets latest nonce from blockchain and database
-2. Updates nonce queue service with the maximum nonce value
-3. Ensures nonce queue stays synchronized with blockchain state
+- Calls `nonceQueueService.reInitNextNonce()` to sync the in-memory nonce queue with the latest nonce from chain and DB.
 
-**Scheduler:** `tasks/nonce-queue-reinit-scheduler.js`
-- Runs on schedule defined by `REINIT_NONCE_QUEUE_CRON_SCHEDULE`
+**Cron:** `REINIT_NONCE_QUEUE_CRON_SCHEDULE`
 
 ---
 
@@ -542,16 +541,17 @@ The `nonce-queue-reinit-scheduler.js` reinitializes the nonce queue on a cron sc
    - When getting operation status, if there's a completed transaction, its hash is returned
    - Otherwise, the hash of the last transaction is returned
 
-8. **Gas Price Management**: 
-   - Supports both EIP-1559 and legacy gas pricing
-   - Gas prices are capped at `MAX_GAS_PRICE`
-   - For OP Stack networks, gas price is fetched from RPC and adjusted
-   - Default gas prices are used if RPC fetch fails
+8. **Gas / fee management**: 
+   - EIP-1559 only (maxFeePerGas, maxPriorityFeePerGas). Fees are capped at `MAX_GAS_PRICE`.
+   - If `OPSTACK=true`, fee data comes from `eth_gasPrice` + `GWEI_ADDED_TO_MEDIAN_GAS_PRICE` (set in env and add to stage-config if needed).
+   - Otherwise fee data from `provider.getFeeData()`; on RPC failure, defaults are used.
 
-9. **Error Handling**: 
-   - Contract errors are parsed using contract ABIs and mapped to error codes
-   - Some errors are logged as warnings (non-critical) while others are logged as errors
-   - Silent errors are not logged at all (see `error-to-warn.json`)
+9. **Error handling**: 
+   - Contract errors are parsed with registry, airdrop, and semaphore ABIs and mapped to codes (see `error-parser.js` and `configs/error-to-warn.json`).
+   - `error-to-warn.json`: `warn: true` → log as warning; `silence: true` → do not log.
 
-10. **Production Mode**: 
-    - Background workers (nonce queue reinit and pending operations) only run in production mode (`NODE_ENV=production`)
+10. **Production mode**: 
+    - Background workers (nonce queue reinit and pending operations) run only when `NODE_ENV=production`.
+
+11. **Tests**: 
+    - Run with `npm run test` (Mocha, timeout 50s). Tests in `test/*.test.js` (e.g. `operation-service.test.js`, `error-parser.test.js`).
